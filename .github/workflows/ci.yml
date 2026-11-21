@@ -58,6 +58,11 @@ jobs:
           unzip -tq "$archive"
           unzip -q "$archive" -d "$unpacked"
           diff -qr "$theme" "$unpacked/top-pariks"
+
+          checked_in="$(mktemp -d)"
+          unzip -tq top-pariks.zip
+          unzip -q top-pariks.zip -d "$checked_in"
+          diff -qr "$unpacked" "$checked_in"
       - uses: actions/upload-artifact@v4
         with:
           name: top-pariks-theme
