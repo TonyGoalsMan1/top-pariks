@@ -1,0 +1,66 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "meta": {
+    "author": "TOP-PARIKS",
+    "title": "TOP-PARIKS · PREVIEW-001",
+    "description": "Тестовый магазин из Draft PR #8 (ARCH-007)."
+  },
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "6.9.1"
+  },
+  "landingPage": "/",
+  "steps": [
+    {
+      "step": "defineWpConfigConsts",
+      "consts": {
+        "WP_ENVIRONMENT_TYPE": "local",
+        "DISABLE_WP_CRON": true,
+        "WP_HTTP_BLOCK_EXTERNAL": true
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "blogname": "TOP-PARIKS · тестовый магазин",
+        "blog_public": "0",
+        "WPLANG": "ru_RU",
+        "users_can_register": "0",
+        "permalink_structure": "/%postname%/"
+      }
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "url",
+        "url": "https://downloads.wordpress.org/plugin/woocommerce.10.5.3.zip"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "installTheme",
+      "themeData": {
+        "resource": "url",
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/1b63c584cde37ec4d9abdddd3115fb3097fb8070/top-pariks.zip"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "mkdir",
+      "path": "/wordpress/wp-content/mu-plugins"
+    },
+    {
+      "step": "writeFile",
+      "path": "/wordpress/wp-content/mu-plugins/top-pariks-preview.php",
+      "data": "<?php\ndefined('ABSPATH') || exit;\n\nadd_filter('pre_wp_mail', '__return_true');\nadd_filter('woocommerce_available_payment_gateways', '__return_empty_array');\nadd_action('woocommerce_checkout_process', static function () {\n    wc_add_notice('Оформление заказов отключено в предпросмотре.', 'error');\n});\nadd_filter('woocommerce_is_purchasable', static function ($purchasable, $product) {\n    return $purchasable && strpos($product->get_sku(), 'TOPQA-') === 0;\n}, 10, 2);\n\nadd_action('wp_body_open', static function () {\n    echo '<p style=\"margin:0;padding:0.6rem 1rem;text-align:center;background:#fff3cf;color:#26201c\">TOP-PARIKS · Тестовый магазин. Оформление заказов отключено.</p>';\n});\n\nadd_action('wp_loaded', static function () {\n    remove_action('woocommerce_proceed_to_checkout', 'woocommerce_button_proceed_to_checkout', 20);\n});\nadd_action('template_redirect', static function () {\n    if (is_checkout() || is_account_page()) {\n        wp_safe_redirect(wc_get_cart_url());\n        exit;\n    }\n});\nadd_filter('rest_pre_dispatch', static function ($result, $server, $request) {\n    if (preg_match('#^/wc/store/v[0-9]+/checkout(?:/|$)#', $request->get_route())) {\n        return new WP_Error('preview_checkout_disabled', 'Checkout is disabled in the preview.', ['status' => 403]);\n    }\n    return $result;\n}, 10, 3);\n"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire '/wordpress/wp-load.php';\n\ndefined('ABSPATH') || exit;\n\nif (get_option('top_pariks_test_seeded')) {\n    return;\n}\n\nupdate_option('woocommerce_coming_soon', 'no');\nupdate_option('woocommerce_currency', 'RUB');\nupdate_option('woocommerce_default_country', 'RU');\nupdate_option('woocommerce_calc_taxes', 'no');\nupdate_option('woocommerce_ship_to_countries', 'disabled');\nupdate_option('woocommerce_enable_myaccount_registration', 'no');\nupdate_option('woocommerce_enable_signup_and_login_from_checkout', 'no');\nupdate_option('woocommerce_allow_tracking', 'no');\nWC_Install::create_pages();\nforeach (['cart' => '[woocommerce_cart]'] as $page => $shortcode) {\n    $page_id = wc_get_page_id($page);\n    if ($page_id <= 0) {\n        throw new RuntimeException(\"Missing WooCommerce page: $page\");\n    }\n\n    $updated = wp_update_post(['ID' => $page_id, 'post_content' => $shortcode], true);\n    if (is_wp_error($updated)) {\n        throw new RuntimeException($updated->get_error_message());\n    }\n}\n\n$categories = [\n    'natural-wigs' => 'ТЕСТ — натуральные парики',\n    'synthetic-wigs' => 'ТЕСТ — синтетические парики',\n    'short-wigs' => 'ТЕСТ — короткие парики',\n    'long-wigs' => 'ТЕСТ — длинные парики',\n];\n$category_ids = [];\nforeach ($categories as $slug => $label) {\n    $term = term_exists($slug, 'product_cat') ?: wp_insert_term($label, 'product_cat', ['slug' => $slug]);\n    if (is_wp_error($term)) {\n        throw new RuntimeException($term->get_error_message());\n    }\n\n    $category_ids[$slug] = (int) $term['term_id'];\n}\n\n$fixtures = [\n    ['TOPQA-NATURAL', 'ТЕСТ — модель Atelier', '19.00', ['natural-wigs', 'long-wigs']],\n    ['TOPQA-SYNTHETIC', 'ТЕСТ — модель Studio', '11.00', ['synthetic-wigs', 'short-wigs']],\n];\nforeach ($fixtures as [$sku, $name, $price, $slugs]) {\n    $existing_id = wc_get_product_id_by_sku($sku);\n    $product = new WC_Product_Simple($existing_id ?: 0);\n    $product->set_sku($sku);\n    $product->set_name($name);\n    $product->set_slug(strtolower($sku));\n    $product->set_regular_price($price);\n    $product->set_status('publish');\n    $product->set_description('Демонстрационный товар для проверки каталога и корзины TOP-PARIKS.');\n    $product->set_virtual(true);\n    $product->set_category_ids(array_map(static function ($slug) use ($category_ids) {\n        return $category_ids[$slug];\n    }, $slugs));\n    $image = $sku === 'TOPQA-NATURAL' ? 'product-1.webp' : 'product-2.webp';\n    $path = get_stylesheet_directory() . '/assets/images/' . $image;\n    $upload = wp_upload_bits($image, null, file_get_contents($path));\n    if ($upload['error']) {\n        throw new RuntimeException($upload['error']);\n    }\n\n    $image_id = wp_insert_attachment([\n        'post_mime_type' => 'image/webp',\n        'post_title' => $name,\n        'post_status' => 'inherit',\n    ], $upload['file'], 0, true);\n    if (is_wp_error($image_id)) {\n        throw new RuntimeException($image_id->get_error_message());\n    }\n\n    [$width, $height] = getimagesize($upload['file']);\n    wp_update_attachment_metadata($image_id, [\n        'width' => $width,\n        'height' => $height,\n        'file' => _wp_relative_upload_path($upload['file']),\n        'sizes' => [],\n    ]);\n    $product->set_image_id($image_id);\n    $product->save();\n}\n\nflush_rewrite_rules();\nupdate_option('top_pariks_test_seeded', '1');\n\n"
+    }
+  ]
+}
