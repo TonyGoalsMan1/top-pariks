@@ -6,7 +6,7 @@
       "step": "installTheme",
       "themeZipFile": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/toppariks/main/top-pariks.zip"
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/main/top-pariks.zip"
       },
       "options": {
         "activate": true

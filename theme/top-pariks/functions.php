@@ -28,6 +28,24 @@ function tp_fallback_menu() {
     }
 }
 
+function tp_archive_canonical() {
+    if (is_front_page() && !is_singular() && !is_paged()) {
+        $url = home_url('/');
+    } elseif (function_exists('is_shop') && !is_search() && (is_shop() || is_product_taxonomy())) {
+        if (isset($_GET['orderby']) || isset($_GET['min_price']) || isset($_GET['max_price'])) {
+            return;
+        }
+        $url = get_pagenum_link(max(1, (int) get_query_var('paged')), false);
+        $tracking = array_intersect_key($_GET, array_flip(['utm_source', 'utm_medium', 'utm_campaign', 'utm_id', 'utm_term', 'utm_content', 'gclid', 'fbclid']));
+        $url = remove_query_arg(array_keys($tracking), $url);
+    } else {
+        return;
+    }
+
+    printf("<link rel=\"canonical\" href=\"%s\" />\n", esc_url($url));
+}
+add_action('wp_head', 'tp_archive_canonical');
+
 function tp_storefront_robots($robots) {
     if (isset($robots['noindex'])) {
         return $robots;
