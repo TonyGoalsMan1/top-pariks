@@ -1,0 +1,45 @@
+name: top-pariks-test
+services:
+  db:
+    image: mariadb:11.4.10
+    environment:
+      MARIADB_DATABASE: top_pariks_test
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: local-test-only
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  wordpress:
+    image: wordpress:6.9.1-php8.3-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${TOP_PARIKS_BIND:-127.0.0.1}:${TOP_PARIKS_PORT:-8080}:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: top_pariks_test
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: local-test-only
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_ENVIRONMENT_TYPE', 'local');
+        define('DISABLE_WP_CRON', true);
+        define('AUTOMATIC_UPDATER_DISABLED', true);
+        define('WP_HTTP_BLOCK_EXTERNAL', true);
+        define('DISALLOW_FILE_MODS', true);
+    volumes:
+      - wp-data:/var/www/html
+      - ./sandbox/wordpress.htaccess:/var/www/html/.htaccess:ro
+      - ./theme/top-pariks:/var/www/html/wp-content/themes/top-pariks:ro
+      - ./sandbox/seed.php:/opt/top-pariks/seed.php:ro
+      - ./sandbox/test-only.php:/var/www/html/wp-content/mu-plugins/test-only.php:ro
+
+volumes:
+  db-data:
+  wp-data:

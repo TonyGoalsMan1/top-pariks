@@ -1,0 +1,1 @@
+</main><footer class="footer"><div class="wrap footer-inner"><p>🚚 Доставка по всей России</p><p>♢ Гарантия качества</p><p>☎ Поддержка и консультация</p><p>© <?php echo esc_html(date('Y')); ?> TOP-PARIKS · <a href="<?php echo esc_url(home_url('/privacy-policy/')); ?>">Политика конфиденциальности</a></p></div></footer><?php wp_footer(); ?></body></html>
