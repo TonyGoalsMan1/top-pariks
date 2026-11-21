@@ -332,6 +332,7 @@ img { max-width: 100%; }
     margin: 0 12px 12px;
     text-decoration: underline;
 }
+.single-product .page-content > div.product { display: block; }
 .woocommerce div.product div.summary .price { color: var(--ink); }
 .woocommerce .woocommerce-ordering { max-width: 100%; }
 .woocommerce .woocommerce-ordering select { max-width: 100%; min-height: 44px; }
