@@ -1,0 +1,16 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "landingPage": "/",
+  "steps": [
+    {
+      "step": "installTheme",
+      "themeZipFile": {
+        "resource": "url",
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/main/top-pariks.zip"
+      },
+      "options": {
+        "activate": true
+      }
+    }
+  ]
+}
