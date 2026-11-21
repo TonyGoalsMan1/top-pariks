@@ -29,7 +29,9 @@
                 <button type="submit">Найти</button>
             </form>
             <div class="header-actions">
-                <a class="wishlist" href="<?php echo esc_url(home_url('/wishlist/')); ?>" aria-label="Избранное"><span aria-hidden="true">♡</span></a>
+                <?php if ($wishlist_url = tp_published_page_url('wishlist')) : ?>
+                    <a class="wishlist" href="<?php echo esc_url($wishlist_url); ?>" aria-label="Избранное"><span aria-hidden="true">♡</span></a>
+                <?php endif; ?>
                 <a class="cart-link" href="<?php echo esc_url(tp_cart_url()); ?>">Корзина<?php if (class_exists('WooCommerce') && WC()->cart) : ?>
                     <span class="cart-count"><?php echo (int) WC()->cart->get_cart_contents_count(); ?></span>
                 <?php endif; ?></a>
