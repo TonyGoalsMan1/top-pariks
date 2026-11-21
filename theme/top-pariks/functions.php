@@ -43,6 +43,9 @@ function tp_meta_description() {
         $post = is_singular() ? get_queried_object() : get_post(wc_get_page_id('shop'));
         if ($post instanceof WP_Post && 'publish' === $post->post_status && '' === $post->post_password) {
             $description = $post->post_excerpt;
+            if ('' === trim($description)) {
+                $description = wp_trim_words(strip_shortcodes(str_replace(['</p>', '</li>'], ' ', $post->post_content)), 30, '…');
+            }
         }
     } elseif (function_exists('is_product_taxonomy') && is_product_taxonomy() && !is_paged() && !tp_has_catalog_parameters()) {
         $description = term_description();
