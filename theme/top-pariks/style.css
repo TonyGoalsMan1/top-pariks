@@ -3,7 +3,7 @@ Theme Name: TOP-PARIKS Atelier
 Theme URI: https://example.com/top-pariks-atelier
 Author: TOP-PARIKS Development
 Description: Responsive boutique storefront with WooCommerce-ready product listings. Demo images are cropped from the supplied design reference and should be replaced before production.
-Version: 1.1.0
+Version: 1.1.1
 Requires at least: 6.2
 Requires PHP: 7.4
 Text Domain: top-pariks
@@ -388,4 +388,31 @@ img { max-width: 100%; }
 @media (max-width: 359px) {
     .brand { flex-basis: 100%; }
     .header-actions { justify-content: flex-start; }
+}
+
+.woocommerce-account .woocommerce-MyAccount-content {
+    overflow-wrap: anywhere;
+}
+.woocommerce-account .woocommerce-MyAccount-navigation ul {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+}
+.woocommerce-account .woocommerce-MyAccount-navigation a {
+    display: block;
+    padding: 10px 12px;
+}
+.woocommerce-account .woocommerce-MyAccount-navigation .is-active a {
+    background: var(--soft);
+    font-weight: bold;
+}
+.woocommerce-account .woocommerce-orders-table .button {
+    margin: 2px;
+    white-space: normal;
+}
+
+@media (max-width: 768px) {
+    .woocommerce-account .woocommerce table.woocommerce-orders-table tbody td.woocommerce-orders-table__cell-order-number {
+        display: block;
+    }
 }

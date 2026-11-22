@@ -9,6 +9,8 @@ update_option('blog_public', '0');
 update_option('woocommerce_default_country', 'US:CA');
 update_option('woocommerce_currency', 'USD');
 update_option('woocommerce_enable_guest_checkout', 'yes');
+update_option('woocommerce_enable_myaccount_registration', 'yes');
+update_option('woocommerce_registration_generate_password', 'no');
 update_option('woocommerce_calc_taxes', 'no');
 update_option('woocommerce_ship_to_countries', 'disabled');
 update_option('woocommerce_cod_settings', [
