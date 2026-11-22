@@ -412,7 +412,12 @@ img { max-width: 100%; }
 }
 
 @media (max-width: 768px) {
-    .woocommerce-account .woocommerce table.woocommerce-orders-table tbody td.woocommerce-orders-table__cell-order-number {
+    .woocommerce-account .woocommerce table.woocommerce-orders-table tbody th.woocommerce-orders-table__cell-order-number {
         display: block;
+        text-align: right;
+    }
+    .woocommerce-account .woocommerce-orders-table__cell-order-number::before {
+        content: attr(data-title) ": ";
+        float: left;
     }
 }
