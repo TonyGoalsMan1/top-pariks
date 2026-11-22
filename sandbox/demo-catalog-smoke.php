@@ -19,7 +19,10 @@ $columns = [
     'Categories' => 'category_ids',
 ];
 $file = fopen($path, 'r');
-$headers = fgetcsv($file);
+if ($file === false) {
+    WP_CLI::error('Cannot read the demo CSV.');
+}
+$headers = fgetcsv($file, 0, ',', '"', '');
 fclose($file);
 if ($headers !== array_keys($columns)) {
     WP_CLI::error('Unexpected demo CSV columns.');
