@@ -13,8 +13,7 @@
     <div class="topbar">
         <div class="wrap">
             <span>Доставка по всей России</span>
-            <span class="shop-phone">+7 (495) 123-45-67 · Ежедневно с 9:00 до 21:00</span>
-            <a href="<?php echo esc_url(wp_login_url()); ?>">Вход / Регистрация</a>
+            <a href="<?php echo esc_url(function_exists('wc_get_page_permalink') ? wc_get_page_permalink('myaccount') : wp_login_url()); ?>">Войти</a>
         </div>
     </div>
     <div class="mast">
