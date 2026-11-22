@@ -8,10 +8,11 @@ touch "$scratch/cookies"
 
 fetch() {
     local path="$1" output="$2"
-    curl --fail --silent --show-error --location --max-redirs 5 --max-time 30 \
+    curl --fail --silent --show-error --max-time 30 \
         --noproxy '*' --resolve "localhost:${TOP_PARIKS_PORT:-8080}:127.0.0.1" \
         --cookie "$scratch/cookies" --cookie-jar "$scratch/cookies" \
-        --output "$scratch/$output" "$base$path"
+        --dump-header "$scratch/headers" --output "$scratch/$output" "$base$path"
+    grep -Eiq '^X-Top-Pariks-Sandbox: local[[:space:]]*$' "$scratch/headers"
 }
 
 fetch /shop/ catalog

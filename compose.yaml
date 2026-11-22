@@ -38,6 +38,8 @@ services:
       - ./sandbox/wordpress.htaccess:/var/www/html/.htaccess:ro
       - ./theme/top-pariks:/var/www/html/wp-content/themes/top-pariks:ro
       - ./sandbox/seed.php:/opt/top-pariks/seed.php:ro
+      - ./fixtures/stage-001-demo-products.csv:/opt/top-pariks/demo-products.csv:ro
+      - ./sandbox/demo-catalog-smoke.php:/opt/top-pariks/demo-catalog-smoke.php:ro
       - ./sandbox/test-only.php:/var/www/html/wp-content/mu-plugins/test-only.php:ro
 
 volumes:

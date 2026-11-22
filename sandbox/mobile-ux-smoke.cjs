@@ -3,6 +3,13 @@ const { chromium, devices } = require('playwright-core');
 
 const base = new URL(process.env.TOP_PARIKS_URL || 'http://localhost:8080');
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(base.hostname), 'Use the local test stand');
+assert.equal(base.protocol, 'http:', 'Use the local HTTP sandbox');
+
+async function restrictToSandbox(context) {
+    await context.route('**/*', route => {
+        return new URL(route.request().url()).origin === base.origin ? route.continue() : route.abort();
+    });
+}
 const label = /ТЕСТ — модель Atelier/;
 
 async function checkLayout(page, step) {
@@ -15,6 +22,7 @@ async function checkLayout(page, step) {
 
 async function open(page, path) {
     const response = await page.goto(new URL(path, base).href);
+    assert.equal(response?.headers()['x-top-pariks-sandbox'], 'local', 'Missing sandbox marker');
     assert.ok(response?.ok(), `${path}: ${response?.status()}`);
 }
 
@@ -183,6 +191,7 @@ async function main() {
     try {
         if (process.argv.includes('--account')) {
             const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+            await restrictToSandbox(page.context());
             page.setDefaultTimeout(15000);
             await checkAccount(page);
             return;
@@ -193,6 +202,7 @@ async function main() {
         ];
         for (const [name, options] of viewports) {
             const context = await browser.newContext(options);
+            await restrictToSandbox(context);
             const page = await context.newPage();
             page.setDefaultTimeout(10000);
             const order = await checkShop(page, name === 'mobile');
@@ -200,6 +210,7 @@ async function main() {
             await context.close();
         }
         const page = await browser.newPage({ javaScriptEnabled: false });
+        await restrictToSandbox(page.context());
         for (const width of [320, 360, 390, 768, 820, 821, 1024, 1440]) {
             await page.setViewportSize({ width, height: 900 });
             for (const path of ['/', '/shop/', '/product/topqa-natural/']) {
