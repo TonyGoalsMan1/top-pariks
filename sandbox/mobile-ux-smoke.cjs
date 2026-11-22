@@ -149,9 +149,18 @@ async function checkAccount(page) {
     await checkAjaxCount(page);
     await open(page, '/my-account/');
     const email = 'store-002@example.test';
+    const username = page.locator('#reg_username');
+    if (await username.isVisible()) {
+        await username.fill('store-002');
+    }
     await page.locator('#reg_email').fill(email);
-    await page.locator('#reg_password').fill('Store002-Unique-Test-Password!');
-    await page.locator('[name=register]').click();
+    const password = page.locator('#reg_password');
+    await password.pressSequentially('Q7!gRv23xK@fP9vD6u!2');
+    await password.press('Tab');
+    const register = page.locator('form.woocommerce-form-register');
+    const invalidFields = await register.locator(':invalid[name]').evaluateAll(fields => fields.map(field => field.name));
+    assert.deepEqual(invalidFields, [], 'Registration form has invalid fields');
+    await register.locator('button[name=register]').click();
     await page.locator('.woocommerce-MyAccount-navigation').waitFor();
     await checkAjaxCount(page);
     const order = await checkShop(page, false);
