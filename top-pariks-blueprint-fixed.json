@@ -3,8 +3,12 @@
   "landingPage": "/",
   "steps": [
     {
+      "step": "setSiteLanguage",
+      "language": "ru_RU"
+    },
+    {
       "step": "installTheme",
-      "themeZipFile": {
+      "themeData": {
         "resource": "url",
         "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/main/top-pariks.zip"
       },
