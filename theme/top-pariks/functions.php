@@ -4,6 +4,25 @@ function tp_setup(){add_theme_support('title-tag');add_theme_support('post-thumb
 add_action('after_setup_theme','tp_setup');
 function tp_assets(){wp_enqueue_style('tp-style',get_stylesheet_uri(),[],wp_get_theme()->get('Version'));wp_enqueue_script('tp-script',get_template_directory_uri().'/assets/site.js',[],wp_get_theme()->get('Version'),true);}
 add_action('wp_enqueue_scripts','tp_assets');
+
+function tp_cart_count_markup() {
+    $count = function_exists('WC') && WC()->cart ? WC()->cart->get_cart_contents_count() : 0;
+    return sprintf('<span class="cart-count">%d</span>', $count);
+}
+
+function tp_cart_count_fragment($fragments) {
+    $fragments['.site-header .cart-count'] = tp_cart_count_markup();
+    return $fragments;
+}
+add_filter('woocommerce_add_to_cart_fragments', 'tp_cart_count_fragment');
+
+function tp_enqueue_cart_fragments() {
+    if (function_exists('WC')) {
+        wp_enqueue_script('wc-cart-fragments');
+    }
+}
+add_action('wp_enqueue_scripts', 'tp_enqueue_cart_fragments', 20);
+
 function tp_image($name){return esc_url(get_template_directory_uri().'/assets/images/'.$name.'.webp');}
 function tp_catalog_url(){return class_exists('WooCommerce')?wc_get_page_permalink('shop'):home_url('/');}
 function tp_cart_url(){return class_exists('WooCommerce')?wc_get_cart_url():home_url('/');}

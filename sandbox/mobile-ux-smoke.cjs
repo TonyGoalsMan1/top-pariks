@@ -127,12 +127,66 @@ async function checkShop(page, mobile) {
     return (await confirmation.locator('.order strong').innerText()).trim();
 }
 
+async function checkAjaxCount(page) {
+    await open(page, '/shop/');
+    const add = page.locator('ul.products > li.product .ajax_add_to_cart').first();
+    const count = page.locator('.site-header .cart-count');
+    for (const quantity of [1, 2]) {
+        const response = page.waitForResponse(res => res.url().includes('wc-ajax=add_to_cart'));
+        await add.click();
+        assert.ok((await response).ok());
+        await count.filter({ hasText: new RegExp(`^${quantity}$`) }).waitFor();
+    }
+    await open(page, '/cart/');
+    await page.locator('.cart_item input.qty').fill('3');
+    await page.locator('[name=update_cart]').click();
+    await count.filter({ hasText: /^3$/ }).waitFor();
+    await page.locator('.cart_item a.remove').click();
+    await count.filter({ hasText: /^0$/ }).waitFor();
+}
+
+async function checkAccount(page) {
+    await checkAjaxCount(page);
+    await open(page, '/my-account/');
+    const email = 'store-002@example.test';
+    const username = page.locator('#reg_username');
+    if (await username.isVisible()) {
+        await username.fill('store-002');
+    }
+    await page.locator('#reg_email').fill(email);
+    const password = page.locator('#reg_password');
+    await password.pressSequentially('Q7!gRv23xK@fP9vD6u!2');
+    await password.press('Tab');
+    const register = page.locator('form.woocommerce-form-register');
+    const invalidFields = await register.locator(':invalid[name]').evaluateAll(fields => fields.map(field => field.name));
+    assert.deepEqual(invalidFields, [], 'Registration form has invalid fields');
+    await register.locator('button[name=register]').click();
+    await page.locator('.woocommerce-MyAccount-navigation').waitFor();
+    await checkAjaxCount(page);
+    const order = await checkShop(page, false);
+    await open(page, '/my-account/orders/');
+    const number = page.locator('.woocommerce-orders-table__cell-order-number a').filter({ hasText: `#${order}` });
+    await number.waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await checkLayout(page, 'mobile order history');
+    await number.click();
+    await page.waitForURL('**/my-account/view-order/**');
+    await page.locator('.woocommerce-order-details').waitFor();
+    console.log('STORE-002: registration, order history and AJAX cart count for guest and customer');
+}
+
 async function main() {
     const browser = await chromium.launch({
         executablePath: process.env.CHROMIUM_PATH,
         args: ['--no-sandbox']
     });
     try {
+        if (process.argv.includes('--account')) {
+            const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+            page.setDefaultTimeout(15000);
+            await checkAccount(page);
+            return;
+        }
         const viewports = [
             ['mobile', devices['iPhone 13']],
             ['desktop', { viewport: { width: 1440, height: 900 } }]
