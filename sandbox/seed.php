@@ -1,6 +1,10 @@
 <?php
 defined('ABSPATH') || exit;
 
+// The sandbox suppresses mail, so customers choose a password at registration.
+update_option('woocommerce_enable_myaccount_registration', 'yes');
+update_option('woocommerce_registration_generate_password', 'no');
+
 if (get_option('top_pariks_test_seeded')) {
     return;
 }

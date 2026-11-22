@@ -13,7 +13,7 @@
     <div class="topbar">
         <div class="wrap">
             <span>Доставка по всей России</span>
-            <a href="<?php echo esc_url(function_exists('wc_get_page_permalink') ? wc_get_page_permalink('myaccount') : wp_login_url()); ?>">Войти</a>
+            <a href="<?php echo esc_url(function_exists('wc_get_page_permalink') ? wc_get_page_permalink('myaccount') : wp_login_url()); ?>"><?php echo is_user_logged_in() ? 'Личный кабинет' : 'Войти'; ?></a>
         </div>
     </div>
     <div class="mast">
@@ -31,8 +31,8 @@
                 <?php if ($wishlist_url = tp_published_page_url('wishlist')) : ?>
                     <a class="wishlist" href="<?php echo esc_url($wishlist_url); ?>" aria-label="Избранное"><span aria-hidden="true">♡</span></a>
                 <?php endif; ?>
-                <a class="cart-link" href="<?php echo esc_url(tp_cart_url()); ?>">Корзина<?php if (class_exists('WooCommerce') && WC()->cart) : ?>
-                    <span class="cart-count"><?php echo (int) WC()->cart->get_cart_contents_count(); ?></span>
+                <a class="cart-link" href="<?php echo esc_url(tp_cart_url()); ?>">Корзина<?php if (function_exists('WC')) : ?>
+                    <?php echo tp_cart_count_markup(); ?>
                 <?php endif; ?></a>
                 <button class="menu-toggle" type="button" aria-controls="tp-navigation" aria-expanded="false" hidden>Меню</button>
             </div>
