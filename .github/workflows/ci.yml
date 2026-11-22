@@ -1,0 +1,103 @@
+name: TOP-PARIKS CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+      - '!main'
+      - '!production'
+      - '!production/**'
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: PHP, JavaScript and Bash
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check PHP syntax
+        run: git ls-files -z -- '*.php' | xargs -0 -r -n 1 php -l
+      - name: Check JavaScript syntax
+        run: git ls-files -z -- '*.js' '*.cjs' '*.mjs' | xargs -0 -r -n 1 node --check
+      - name: Check Bash syntax
+        run: git ls-files -z -- '*.sh' | xargs -0 -r -n 1 bash -n
+
+  theme:
+    name: WordPress theme and ZIP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate and package theme
+        run: |
+          theme=theme/top-pariks
+          for file in style.css index.php functions.php header.php footer.php front-page.php page.php woocommerce.php assets/site.js; do
+            if [[ ! -s "$theme/$file" ]]; then
+              echo "Missing or empty theme file: $theme/$file" >&2
+              exit 1
+            fi
+          done
+          head -c 8192 "$theme/style.css" > "$RUNNER_TEMP/theme-header"
+          grep -Ei '^[[:space:]/*#@]*Theme Name:[[:space:]]*[^[:space:]]' "$RUNNER_TEMP/theme-header"
+          grep -Ei '^[[:space:]/*#@]*Version:[[:space:]]*[0-9]' "$RUNNER_TEMP/theme-header"
+
+          archive="$RUNNER_TEMP/top-pariks.zip"
+          unpacked="$(mktemp -d)"
+          git archive --format=zip --output="$archive" HEAD:theme top-pariks
+          unzip -tq "$archive"
+          unzip -q "$archive" -d "$unpacked"
+          diff -qr "$theme" "$unpacked/top-pariks"
+
+          checked_in="$(mktemp -d)"
+          unzip -tq top-pariks.zip
+          unzip -q top-pariks.zip -d "$checked_in"
+          diff -qr "$unpacked" "$checked_in"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: top-pariks-theme
+          path: ${{ runner.temp }}/top-pariks.zip
+          if-no-files-found: error
+
+  woocommerce:
+    name: WooCommerce smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      COMPOSE_PROJECT_NAME: top-pariks-ci
+      TOP_PARIKS_BIND: 127.0.0.1
+      TOP_PARIKS_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Start test store
+        run: |
+          docker compose config --quiet
+          ./sandbox/start.sh
+      - name: Check catalog, cart and offline checkout
+        run: bash sandbox/woocommerce-smoke.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check customer account and AJAX cart in Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright-core@1.56.1
+          npx playwright-core install chromium
+          node sandbox/mobile-ux-smoke.cjs --account
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=100
+      - name: Remove test containers and volumes
+        if: always()
+        run: docker compose down --volumes
