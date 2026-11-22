@@ -87,6 +87,14 @@ jobs:
           ./sandbox/start.sh
       - name: Check catalog, cart and offline checkout
         run: bash sandbox/woocommerce-smoke.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check customer account and AJAX cart in Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright-core@1.56.1
+          npx playwright-core install chromium
+          node sandbox/mobile-ux-smoke.cjs --account
       - name: Show container logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=100
