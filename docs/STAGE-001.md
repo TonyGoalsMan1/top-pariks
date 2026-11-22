@@ -25,7 +25,7 @@
 
 ## Сборка installable ZIP
 
-В чистом checkout коммита PR выполните команды. Нужны Git, Bash, unzip и GNU coreutils.
+В чистом checkout коммита PR выполните команды. Нужны Git с поддержкой `git archive --mtime`, Bash, unzip и GNU coreutils. При сборке используется время коммита.
 
 ```sh
 ./scripts/package-theme.sh /tmp/top-pariks.zip

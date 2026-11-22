@@ -19,7 +19,7 @@ head -c 8192 "$theme/style.css" > "$scratch/theme-header"
 grep -Ei '^[[:space:]/*#@]*Theme Name:[[:space:]]*[^[:space:]]' "$scratch/theme-header"
 grep -Ei '^[[:space:]/*#@]*Version:[[:space:]]*[0-9]' "$scratch/theme-header"
 
-git archive --format=zip --output="$scratch/top-pariks.zip" HEAD:theme top-pariks
+git archive --format=zip --mtime="$(git show -s --format=%cI HEAD)" --output="$scratch/top-pariks.zip" HEAD:theme top-pariks
 unzip -tq "$scratch/top-pariks.zip"
 unzip -q "$scratch/top-pariks.zip" -d "$scratch/built"
 diff -qr "$theme" "$scratch/built/top-pariks"
