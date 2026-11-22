@@ -1,0 +1,47 @@
+name: TOP-PARIKS staging FTPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Type top-pariks-test.freehosting.dev to confirm the staging target
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: top-pariks-staging
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/main' && inputs.target == 'top-pariks-test.freehosting.dev'
+    uses: ./.github/workflows/ci.yml
+
+  staging:
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: staging-ftps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: top-pariks-theme
+          path: ${{ runner.temp }}/staging-theme
+      - name: Verify the CI archive
+        run: python3 scripts/verify-theme-zip.py "$RUNNER_TEMP/staging-theme/top-pariks.zip"
+      - name: Back up and verify the staging theme over FTPS
+        env:
+          FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          FTPS_PORT: ${{ secrets.STAGING_FTPS_PORT }}
+          FTPS_USER: ${{ secrets.STAGING_FTPS_USER }}
+          FTPS_PASSWORD: ${{ secrets.STAGING_FTPS_PASSWORD }}
+          FTPS_WP_ROOT: ${{ secrets.STAGING_FTPS_WP_ROOT }}
+          FTPS_PRIVATE_DIR: ${{ secrets.STAGING_FTPS_PRIVATE_DIR }}
+          FTPS_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 scripts/staging-ftps.py "$RUNNER_TEMP/staging-theme/top-pariks.zip"
