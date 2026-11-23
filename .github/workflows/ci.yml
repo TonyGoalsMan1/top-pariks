@@ -31,7 +31,7 @@ jobs:
       - name: Check Bash syntax
         run: git ls-files -z -- '*.sh' | xargs -0 -r -n 1 bash -n
       - name: Check staging FTPS Python syntax
-        run: python3 -m py_compile scripts/staging-ftps.py scripts/staging-ftps-init.py
+        run: python3 -m py_compile scripts/staging-ftps.py scripts/staging-ftps-init.py scripts/staging-ftps-probe.py
       - name: Test staging FTPS diagnostics and retries
         run: python3 -B -m unittest discover -s tests -v
 

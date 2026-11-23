@@ -1,0 +1,73 @@
+name: TOP-PARIKS staging FTPS write probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Enter https://top-pariks-test.freehosting.dev
+        type: string
+        required: true
+      mode:
+        description: Run offline or write one test file
+        type: choice
+        options:
+          - dry-run
+          - probe
+        default: dry-run
+        required: true
+      confirmation:
+        description: For probe, enter the confirmation from STAGE-007
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      inputs.target == 'https://top-pariks-test.freehosting.dev' &&
+      inputs.mode == 'dry-run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate the target offline
+        env:
+          FTPS_TARGET: ${{ inputs.target }}
+          FTPS_MODE: dry-run
+        run: python3 scripts/staging-ftps-probe.py
+
+  probe:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.run_attempt == '1' &&
+      inputs.target == 'https://top-pariks-test.freehosting.dev' &&
+      inputs.mode == 'probe' &&
+      inputs.confirmation == 'write one probe on top-pariks-test.freehosting.dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: staging-ftps
+    concurrency:
+      group: top-pariks-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Write and verify one staging diagnostic file
+        env:
+          FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          FTPS_PORT: ${{ secrets.STAGING_FTPS_PORT }}
+          FTPS_USER: ${{ secrets.STAGING_FTPS_USER }}
+          FTPS_PASSWORD: ${{ secrets.STAGING_FTPS_PASSWORD }}
+          FTPS_WP_ROOT: ${{ secrets.STAGING_FTPS_WP_ROOT }}
+          FTPS_PRIVATE_DIR: ${{ secrets.STAGING_FTPS_PRIVATE_DIR }}
+          FTPS_TARGET: ${{ inputs.target }}
+          FTPS_MODE: probe
+          FTPS_CONFIRMATION: ${{ inputs.confirmation }}
+          FTPS_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: python3 scripts/staging-ftps-probe.py
