@@ -48,7 +48,7 @@ def check(ftp, mode):
     with deployment.operation(ftp, "login-directory", "inspect"):
         login_directory = ftp.pwd()
     if login_directory != "/":
-        raise CheckFailed("The FTPS login directory must be /.")
+        raise CheckFailed("The expected FTPS login directory was not confirmed.")
     root = entries(ftp, "/", "account-layout")
     for directory in (WP_ROOT, PRIVATE):
         name = directory[1:]
@@ -63,14 +63,28 @@ def check(ftp, mode):
     backup = entries(ftp, PRIVATE, "backup-layout")
     path = f"{PRIVATE}/{MARKER}"
     if MARKER in backup:
-        if backup[MARKER] != (MARKER, "file"):
+        name, kind = backup[MARKER]
+        if name != MARKER:
+            raise CheckFailed("The listed marker name has unexpected capitalization.")
+        if kind != "file":
             raise CheckFailed("The marker name is occupied by an unexpected entry.")
         verify_marker(ftp, path)
         print("Staging marker verified.")
         return
     if mode == "check":
-        print("Staging FTPS layout verified. Marker absent from the directory listing.")
-        return
+        try:
+            verify_marker(ftp, path)
+        except deployment.OperationFailed as error:
+            raise CheckFailed(
+                f"MLSD did not list the marker and RETR failed ({error}). "
+                "The marker may be missing or inaccessible."
+            ) from None
+        except CheckFailed as error:
+            raise CheckFailed(f"MLSD did not list the marker. {error}") from None
+        raise CheckFailed(
+            "MLSD did not list the marker, but RETR verified its bytes. "
+            "The listing and direct read disagree."
+        )
 
     with deployment.operation(ftp, "marker-initialize", "write"):
         ftp.storbinary(f"STOR {path}", BytesIO(SITE))
@@ -85,7 +99,7 @@ def main():
             or (mode == "initialize" and get("FTPS_CONFIRMATION") != CONFIRMATION)):
         raise CheckFailed("The staging target or initialization confirmation is invalid.")
     if get("FTPS_WP_ROOT") != WP_ROOT or get("FTPS_PRIVATE_DIR") != PRIVATE:
-        raise CheckFailed("The configured paths must be /htdocs and /top-pariks-backups.")
+        raise CheckFailed("The configured staging directories do not match the expected layout.")
 
     host, port = get("FTPS_HOST"), int(get("FTPS_PORT"))
     user, password = get("FTPS_USER"), get("FTPS_PASSWORD")
@@ -99,12 +113,13 @@ def main():
 
 
 if __name__ == "__main__":
+    readiness = "Staging is not ready for publication. " if os.getenv("FTPS_MODE") == "check" else ""
     try:
         main()
     except deployment.OperationFailed as error:
-        sys.exit(f"FTPS failed ({error}). See docs/STAGE-004.md.")
+        sys.exit(f"{readiness}FTPS failed ({error}). See docs/STAGE-004.md.")
     except CheckFailed as error:
-        sys.exit(f"{error} See docs/STAGE-003.md.")
+        sys.exit(f"{readiness}{error} See docs/STAGE-003.md.")
     except (OSError, KeyError, ValueError, EOFError, ftplib.Error):
         # Server replies and configuration values may contain sensitive details.
-        sys.exit("FTPS check or initialization failed. See docs/STAGE-003.md.")
+        sys.exit(f"{readiness}FTPS check or initialization failed. See docs/STAGE-003.md.")
