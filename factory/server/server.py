@@ -4,6 +4,7 @@
 import argparse
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -232,6 +233,16 @@ def package_upload(site, release):
     }
     write_json(release / "manifest.json", manifest)
     verify_release(site, release)
+    # Git archives made from a tree can differ in timestamps for the same
+    # commit. Compare only the validated paths and bytes when replaying it.
+    records = {}
+    with ZipFile(package) as archive:
+        for entry in archive.infolist():
+            with archive.open(entry) as stream:
+                records[entry.filename] = hashlib.file_digest(stream, "sha256").hexdigest()
+    manifest["content_sha256"] = hashlib.sha256(
+        json.dumps(records, sort_keys=True).encode()
+    ).hexdigest()
     return manifest
 
 
@@ -259,7 +270,7 @@ def receive(*, wait=0):
         if site.last_release.exists():
             previous = read_json(site.last_release)
             if previous["commit"] == manifest["commit"]:
-                if previous != manifest:
+                if previous["content_sha256"] != manifest["content_sha256"]:
                     raise FactoryError("Different package for a published commit")
                 with quiet():
                     health(site)

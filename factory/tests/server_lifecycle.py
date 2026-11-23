@@ -168,8 +168,14 @@ def main():
                 pass
             else:
                 raise AssertionError("Concurrent deployment passed")
-        upload(first, releases[first.id] / "theme.zip", "a" * 40)
-        upload(first, releases[first.id] / "theme.zip", "a" * 40)
+        release = releases[first.id] / "theme.zip"
+        upload(first, release, "a" * 40)
+        repacked = root / "repacked.zip"
+        with ZipFile(release) as source, ZipFile(repacked, "w") as target:
+            for name in source.namelist():
+                target.writestr(name, source.read(name))
+        assert repacked.read_bytes() != release.read_bytes()
+        upload(first, repacked, "a" * 40)
 
         broken = root / "broken.zip"
         with ZipFile(releases[first.id] / "theme.zip") as source, ZipFile(broken, "w") as target:
@@ -178,6 +184,12 @@ def main():
                 if entry.filename == f"{first.slug}/functions.php":
                     data = b"<?php throw new RuntimeException('synthetic broken theme');"
                 target.writestr(entry, data)
+        try:
+            upload(first, broken, "a" * 40)
+        except FactoryError as error:
+            assert str(error) == "Different package for a published commit"
+        else:
+            raise AssertionError("Different theme bytes were accepted for the same commit")
         try:
             upload(first, broken, "b" * 40)
         except FactoryError:
