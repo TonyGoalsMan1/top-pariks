@@ -64,6 +64,10 @@ Push в `main` запускает действующий CI и Factory CI. Пу�
 
 ## Проверки
 
+23 ноября 2026 года в изолированном Debian с Docker прошли 26 тестов FTPS, 4 теста Factory и исходный жизненный цикл STAGE-012 с двумя магазинами. Отдельная проверка через локальный HTTPS webhook доставила по одному сообщению о сбое и о восстановлении. Actionlint принял оба workflow Factory.
+
+На одноразовом Ubuntu runner прошли исходный TOP-PARIKS CI и тест системного bootstrap с Docker, уже установленным на runner. Проверены повторный запуск на развёрнутом сайте, HTTPS с внутренним CA, публикация с закреплённым ключом и отказ при попытках сменить ключ хоста, выполнить произвольную команду или открыть туннель. [TOP-PARIKS CI](https://github.com/TonyGoalsMan1/top-pariks/actions/runs/45263963680) · [Bootstrap и SSH](https://github.com/TonyGoalsMan1/top-pariks/actions/runs/45263963482/job/138005816472)
+
 - `python3 -B -m unittest discover -s tests -v` и `python3 -B -m unittest discover -s factory/tests -v` проверяют прежние сценарии, форматы релиза, копии и очередь.
 - `python3 -B factory/tests/lifecycle.py` запускает исходный жизненный цикл STAGE-012.
 - `python3 -B factory/tests/server_lifecycle.py` запускает два изолированных Compose-проекта, HTTPS через внутренний CA Caddy, проверяет конфликтующие операции, публикацию, отказ и откат сломанной темы, возобновление после прерывания, зашифрованный backup, восстановление и очередь. С `FACTORY_TEST_S3=1` и установленным `moto[server]==5.1.20` дополнительно проверяет S3 API через HTTPS.
