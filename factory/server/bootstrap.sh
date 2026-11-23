@@ -14,6 +14,10 @@ esac
 [[ -d /run/systemd/system ]]
 exec 9>/run/wordpress-factory-bootstrap.lock
 flock -n 9
+install -d -m 0700 /var/lib/wordpress-factory
+# Serialize bootstrap and package changes with server operations.
+exec 8>/var/lib/wordpress-factory/server.lock
+flock -w 600 -x 8
 source_dir=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -27,7 +31,8 @@ if ! command -v docker >/dev/null; then
     docker_key=$(mktemp)
     trap 'rm -f -- "$docker_key"' EXIT
     curl -fsS --proto '=https' "https://download.docker.com/linux/$ID/gpg" -o "$docker_key"
-    fingerprint=$(gpg --batch --show-keys --with-colons "$docker_key" | awk -F: '$1=="fpr" && !seen++ {print $10}')
+    fingerprint=$(gpg --batch --show-keys --with-colons "$docker_key" |
+        awk -F: '$1=="pub" {primary=1} $1=="fpr" && primary {print $10; primary=0}')
     [[ "$fingerprint" == 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]]
     install -m 0644 "$docker_key" /etc/apt/keyrings/factory-docker.asc
     printf 'deb [arch=%s signed-by=/etc/apt/keyrings/factory-docker.asc] https://download.docker.com/linux/%s %s stable\n' \
@@ -46,10 +51,6 @@ engine_version=$(docker version --format '{{.Server.Version}}')
     exit 1
 }
 
-install -d -m 0700 /var/lib/wordpress-factory
-# Serialize code installation with server operations.
-exec 8>/var/lib/wordpress-factory/server.lock
-flock -w 600 -x 8
 install -d -m 0755 /etc/wordpress-factory /usr/local/lib/wordpress-factory /usr/local/libexec /etc/caddy
 [[ -e /etc/wordpress-factory/deploy.keys ]] || install -m 0644 /dev/null /etc/wordpress-factory/deploy.keys
 if ! cmp -s "$1" /etc/wordpress-factory/deploy.keys; then
