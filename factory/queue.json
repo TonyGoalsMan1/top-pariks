@@ -44,10 +44,11 @@
     {
       "id": "github-ci",
       "depends_on": ["recovery"],
-      "status": "running",
+      "status": "done",
       "criteria": ["Factory lifecycle and existing TOP-PARIKS CI pass for the PR."],
       "retry_policy": "read_only",
-      "verify": ".github/workflows/factory.yml and .github/workflows/ci.yml"
+      "verify": ".github/workflows/factory.yml and .github/workflows/ci.yml",
+      "evidence": [45258606169, 45258603762]
     },
     {
       "id": "staging-pilot",
