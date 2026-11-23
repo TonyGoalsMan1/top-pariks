@@ -160,3 +160,5 @@ function tp_sitemap_post_query_args($args, $post_type) {
     return $args;
 }
 add_filter('wp_sitemaps_posts_query_args', 'tp_sitemap_post_query_args', 10, 2);
+
+require_once __DIR__ . '/storefront-setup.php';

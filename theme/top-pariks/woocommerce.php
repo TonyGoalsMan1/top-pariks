@@ -21,7 +21,19 @@
             <?php
         endif;
     endif;
+    $custom_empty_state = is_shop() && !is_search() && !is_paged() && !tp_has_catalog_parameters();
+    $render_empty_state = static function () {
+        echo '<p class="notice">В каталоге пока нет товаров. Загляните позже, чтобы посмотреть новые модели TOP-PARIKS.</p>';
+    };
+    if ($custom_empty_state) {
+        remove_action('woocommerce_no_products_found', 'wc_no_products_found');
+        add_action('woocommerce_no_products_found', $render_empty_state);
+    }
     woocommerce_content();
+    if ($custom_empty_state) {
+        remove_action('woocommerce_no_products_found', $render_empty_state);
+        add_action('woocommerce_no_products_found', 'wc_no_products_found');
+    }
     ?>
 </div>
 <?php get_footer(); ?>

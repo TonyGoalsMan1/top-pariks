@@ -85,6 +85,12 @@ jobs:
         run: |
           docker compose config --quiet
           ./sandbox/start.sh
+      - name: Check storefront provisioning and routes
+        run: |
+          docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar eval-file - < sandbox/storefront-smoke.php
+          for path in / /shop/ /about/ /delivery/ /contacts/ /cart/ /my-account/; do
+            curl --fail --silent --show-error --location --max-redirs 5 --max-time 30 "$TOP_PARIKS_URL$path" > /dev/null
+          done
       - name: Check catalog, cart and offline checkout
         run: bash sandbox/woocommerce-smoke.sh
       - uses: actions/setup-node@v4

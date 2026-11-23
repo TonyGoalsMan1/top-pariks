@@ -25,4 +25,9 @@
 </section>
 <section class="wrap"><div class="promo"><div class="promo-copy"><h2>Красота и уверенность<br>в каждом образе</h2><p>Найдите модель, которая подходит именно вам.</p><a class="btn" href="<?php echo esc_url(tp_catalog_url()); ?>">Выбрать парик →</a></div><img loading="lazy" src="<?php echo tp_image('promo'); ?>" alt="Модель с длинными светлыми волосами"></div></section>
 <section class="wrap seo-copy"><h2>Парики и накладные волосы TOP-PARIKS</h2><p>В нашем каталоге вы сможете подобрать парики из натуральных и искусственных волос, короткие и длинные модели, шиньоны и накладные волосы. Выбирайте подходящий оттенок, длину и стиль. Перед покупкой уточняйте наличие и характеристики товара.</p></section>
+<?php if (is_page() && have_posts() && trim(get_post_field('post_content', get_queried_object_id()))) : ?>
+    <section class="wrap page-content">
+        <?php the_post(); the_content(); ?>
+    </section>
+<?php endif; ?>
 <?php get_footer(); ?>
