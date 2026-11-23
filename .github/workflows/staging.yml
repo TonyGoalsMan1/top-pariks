@@ -1,0 +1,99 @@
+name: TOP-PARIKS staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Deploy the current main commit or restore a saved staging backup
+        type: choice
+        options:
+          - deploy
+          - rollback
+      backup_id:
+        description: Backup ID from the deployment log (rollback only)
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: top-pariks-staging
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/main' && inputs.operation == 'deploy'
+    uses: ./.github/workflows/ci.yml
+
+  staging:
+    needs: ci
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/main' &&
+      ((inputs.operation == 'deploy' && needs.ci.result == 'success') ||
+       (inputs.operation == 'rollback' && needs.ci.result == 'skipped')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: inputs.operation == 'deploy'
+        with:
+          name: top-pariks-theme
+          path: ${{ runner.temp }}/staging-theme
+      - name: Verify the CI archive before connecting
+        if: inputs.operation == 'deploy'
+        run: python3 scripts/verify-theme-zip.py "$RUNNER_TEMP/staging-theme/top-pariks.zip"
+      - name: Update or restore the staging theme
+        env:
+          OPERATION: ${{ inputs.operation }}
+          BACKUP_ID: ${{ inputs.backup_id }}
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+          WP_PATH: ${{ secrets.STAGING_WP_PATH }}
+          BACKUP_PATH: ${{ secrets.STAGING_BACKUP_PATH }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for key in SSH_HOST SSH_PORT SSH_USER SSH_KEY SSH_KNOWN_HOSTS WP_PATH BACKUP_PATH; do
+            [[ -n "${!key}" ]] || { echo "Missing staging configuration: $key" >&2; exit 1; }
+          done
+          [[ "$SSH_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && "$SSH_USER" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]*$ ]]
+          [[ "$SSH_PORT" =~ ^[1-9][0-9]{0,4}$ && "$SSH_PORT" -le 65535 ]]
+          [[ "$WP_PATH" =~ ^/[A-Za-z0-9_./-]+$ && "$BACKUP_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          if [[ "$OPERATION" == rollback ]]; then
+            [[ "$BACKUP_ID" =~ ^[0-9]+-[0-9]+$ ]] || { echo 'A valid backup ID is required.' >&2; exit 1; }
+          else
+            [[ "$OPERATION" == deploy && -z "$BACKUP_ID" ]]
+          fi
+
+          credentials="$(mktemp -d)"
+          trap 'rm -rf -- "$credentials"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$credentials/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$credentials/known_hosts"
+          unset SSH_KEY SSH_KNOWN_HOSTS
+
+          payload="$credentials/payload"
+          {
+            if [[ "$OPERATION" == deploy ]]; then
+              archive="$RUNNER_TEMP/staging-theme/top-pariks.zip"
+              printf "artifact_sha256='%s'\n" "$(sha256sum "$archive" | cut -d ' ' -f 1)"
+              printf "write_archive() { base64 --decode <<'THEME_ZIP'\n"
+              base64 "$archive"
+              printf 'THEME_ZIP\n}\n'
+            fi
+            cat scripts/staging-theme.sh
+          } > "$payload"
+
+          ssh -T -p "$SSH_PORT" -i "$credentials/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null \
+            -o UserKnownHostsFile="$credentials/known_hosts" \
+            "$SSH_USER@$SSH_HOST" \
+            "bash -s -- '$OPERATION' '$WP_PATH' '$BACKUP_PATH' '$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT' '$BACKUP_ID'" \
+            < "$payload"
