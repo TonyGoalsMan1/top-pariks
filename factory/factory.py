@@ -194,7 +194,7 @@ def install_theme(site, source, backup=False):
         mv -- "$stage/$2" "wp-content/themes/$3"
     """
     with source.open("rb") as stream:
-        site.files(script, "-xzf" if backup else "-x", member, site.slug, stdin=stream)
+        site.files(script, "-xz" if backup else "-x", member, site.slug, stdin=stream)
 
 
 @contextlib.contextmanager
