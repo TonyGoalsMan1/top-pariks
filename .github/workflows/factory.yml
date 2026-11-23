@@ -25,3 +25,16 @@ jobs:
         run: python3 -m unittest discover -s factory/tests -v
       - name: Run two isolated WordPress and WooCommerce stores
         run: python3 factory/tests/lifecycle.py
+
+  server:
+    name: Factory server integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify bootstrap, HTTPS and restricted SSH on a disposable runner
+        run: bash factory/tests/server_bootstrap.sh
+      - name: Test isolated sites, rollback, backups and queue
+        run: python3 -B factory/tests/server_lifecycle.py

@@ -27,7 +27,7 @@ services:
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD_FILE: /run/secrets/database_password
       WORDPRESS_CONFIG_EXTRA: |
-        define('WP_ENVIRONMENT_TYPE', 'local');
+        define('WP_ENVIRONMENT_TYPE', '${FACTORY_ENVIRONMENT:-local}');
         define('DISABLE_WP_CRON', true);
         define('AUTOMATIC_UPDATER_DISABLED', true);
         define('WP_HTTP_BLOCK_EXTERNAL', true);

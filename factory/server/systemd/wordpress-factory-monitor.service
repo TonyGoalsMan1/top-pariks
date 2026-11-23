@@ -1,0 +1,10 @@
+[Unit]
+Description=WordPress Factory monitor
+After=docker.service caddy.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/local/sbin/wordpress-factory monitor
+TimeoutStartSec=30min

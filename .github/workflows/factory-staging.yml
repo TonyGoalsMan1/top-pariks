@@ -1,0 +1,54 @@
+name: WordPress Factory staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-factory-staging
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/main' && vars.FACTORY_STAGING_ENABLED == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  factory:
+    if: github.ref == 'refs/heads/main' && vars.FACTORY_STAGING_ENABLED == 'true'
+    uses: ./.github/workflows/factory.yml
+
+  deploy:
+    needs: [ci, factory]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: factory-staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build and verify the checked commit
+        env:
+          SITE: ${{ vars.FACTORY_SITE_ID }}
+        run: |
+          set -euo pipefail
+          [[ "$SITE" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]
+          profile="factory/sites/$SITE.json"
+          python3 factory/factory.py --site "$profile" build "$RUNNER_TEMP/factory-release" --ref "$GITHUB_SHA"
+          python3 factory/factory.py --site "$profile" verify-release "$RUNNER_TEMP/factory-release"
+      - name: Deploy the current main commit through pinned SSH
+        env:
+          SSH_HOST: ${{ secrets.FACTORY_SSH_HOST }}
+          SSH_PORT: ${{ vars.FACTORY_SSH_PORT || '2222' }}
+          SSH_KEY: ${{ secrets.FACTORY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.FACTORY_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [[ "$(git ls-remote --exit-code origin refs/heads/main | cut -f1)" != "$GITHUB_SHA" ]]; then
+            echo 'A newer main commit is available. Skipping this release.'
+            exit 0
+          fi
+          factory/server/send.sh "$GITHUB_SHA" "$RUNNER_TEMP/factory-release/theme.zip"

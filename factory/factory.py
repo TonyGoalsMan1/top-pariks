@@ -33,6 +33,10 @@ ERRORS = (FactoryError, OSError, ValueError, TypeError, KeyError, AttributeError
           subprocess.SubprocessError, tarfile.TarError, BadZipFile)
 
 
+class SiteBusy(FactoryError):
+    pass
+
+
 class Site:
     repo = REPO
 
@@ -105,7 +109,7 @@ class Site:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
-                raise FactoryError(f"Another Factory operation owns {self.id}") from error
+                raise SiteBusy(f"Another Factory operation owns {self.id}") from error
             profile = self.root / "profile.json"
             if profile.exists() and read_json(profile) != self.backup_profile:
                 raise FactoryError("Existing state belongs to a different site profile")

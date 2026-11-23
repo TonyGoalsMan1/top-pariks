@@ -1,0 +1,15 @@
+services:
+  db:
+    restart: unless-stopped
+    networks: [database]
+    logging:
+      driver: none
+  wordpress:
+    restart: unless-stopped
+    networks: [default, database]
+    logging:
+      driver: none
+
+networks:
+  database:
+    internal: true

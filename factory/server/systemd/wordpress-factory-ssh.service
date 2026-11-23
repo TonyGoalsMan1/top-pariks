@@ -1,0 +1,12 @@
+[Unit]
+Description=WordPress Factory staging-only SSH receiver
+After=network.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/install -d -m 0755 /run/sshd
+ExecStart=/usr/sbin/sshd -D -f /etc/wordpress-factory/sshd_config
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
