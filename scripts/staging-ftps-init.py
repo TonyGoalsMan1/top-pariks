@@ -69,18 +69,21 @@ def check(ftp, mode):
         if kind != "file":
             raise CheckFailed("The marker name is occupied by an unexpected entry.")
         verify_marker(ftp, path)
-        print("Staging marker verified.")
-        return
-    if mode == "check":
-        try:
-            verify_marker(ftp, path)
-        except deployment.OperationFailed as error:
+        return False
+
+    try:
+        verify_marker(ftp, path)
+    except deployment.OperationFailed as error:
+        # Only RETR 550 permits the guarded write. It can also mean access denied,
+        # so initialize still requires independent confirmation of absence.
+        if mode != "initialize" or (error.command, error.reply_code) != ("RETR", "550"):
             raise CheckFailed(
                 f"MLSD did not list the marker and RETR failed ({error}). "
                 "The marker may be missing or inaccessible."
             ) from None
-        except CheckFailed as error:
-            raise CheckFailed(f"MLSD did not list the marker. {error}") from None
+    except CheckFailed as error:
+        raise CheckFailed(f"MLSD did not list the marker. {error}") from None
+    else:
         raise CheckFailed(
             "MLSD did not list the marker, but RETR verified its bytes. "
             "The listing and direct read disagree."
@@ -88,8 +91,7 @@ def check(ftp, mode):
 
     with deployment.operation(ftp, "marker-initialize", "write"):
         ftp.storbinary(f"STOR {path}", BytesIO(SITE))
-    verify_marker(ftp, path)
-    print("Staging marker created and verified.")
+    return True
 
 
 def main():
@@ -109,7 +111,20 @@ def main():
         raise CheckFailed("The FTPS credentials configuration is invalid.")
 
     with deployment.session(host, port, user, password) as ftp:
-        check(ftp, mode)
+        wrote_marker = check(ftp, mode)
+    if not wrote_marker:
+        print("Staging marker verified.")
+        return
+
+    try:
+        with deployment.session(host, port, user, password) as ftp:
+            check(ftp, "check")
+    except (CheckFailed, deployment.OperationFailed) as error:
+        raise CheckFailed(
+            f"Marker write completed but verification in a fresh session failed ({error}). "
+            "Run check before retrying."
+        ) from None
+    print("Staging marker created and verified.")
 
 
 if __name__ == "__main__":
@@ -119,7 +134,7 @@ if __name__ == "__main__":
     except deployment.OperationFailed as error:
         sys.exit(f"{readiness}FTPS failed ({error}). See docs/STAGE-004.md.")
     except CheckFailed as error:
-        sys.exit(f"{readiness}{error} See docs/STAGE-003.md.")
+        sys.exit(f"{readiness}{error} See docs/STAGE-006.md.")
     except (OSError, KeyError, ValueError, EOFError, ftplib.Error):
         # Server replies and configuration values may contain sensitive details.
-        sys.exit(f"{readiness}FTPS check or initialization failed. See docs/STAGE-003.md.")
+        sys.exit(f"{readiness}FTPS check or initialization failed. See docs/STAGE-006.md.")

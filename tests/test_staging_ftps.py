@@ -43,13 +43,20 @@ class LocalFTP:
             raise ftplib.error_perm(f"550 private path {name} exists") from None
 
     def retrbinary(self, command, callback):
-        callback(self.path(command.split(" ", 1)[1]).read_bytes())
+        self.last_command = "RETR"
+        try:
+            data = self.path(command.split(" ", 1)[1]).read_bytes()
+        except FileNotFoundError:
+            raise ftplib.error_perm("550 file unavailable") from None
+        callback(data)
+        return "226 Transfer complete"
 
     def storbinary(self, command, stream):
         self.writes += 1
         self.path(command.split(" ", 1)[1]).write_bytes(stream.read())
 
     def rename(self, source, target):
+        self.last_command = None
         if self.fail_restore and source.endswith("/previous"):
             raise ftplib.error_perm("550 recovery-sensitive-detail")
         self.path(source).rename(self.path(target))
@@ -166,6 +173,95 @@ class FTPSRetry(unittest.TestCase):
                 self.ftp.retrbinary.assert_not_called()
                 self.assertEqual(self.ftp.writes, 0)
 
+    def marker_env(self, mode):
+        return {
+            "FTPS_MODE": mode,
+            "FTPS_CONFIRMATION": init.CONFIRMATION,
+            "FTPS_TARGET": deploy.SITE.decode("ascii"),
+            "FTPS_WP_ROOT": init.WP_ROOT,
+            "FTPS_PRIVATE_DIR": init.PRIVATE,
+            "FTPS_HOST": "ftp.example.com",
+            "FTPS_PORT": "21",
+            "FTPS_USER": "user",
+            "FTPS_PASSWORD": "password",
+        }
+
+    def test_initialize_refuses_to_write_when_listing_hides_existing_bytes(self):
+        listing = self.ftp.mlsd
+        self.ftp.mlsd = lambda path: [] if path == PRIVATE else listing(path)
+        for data, reason in (
+            (deploy.SITE, "The listing and direct read disagree"),
+            (b"other", "differs from the required bytes"),
+        ):
+            with self.subTest(reason=reason):
+                self.marker.write_bytes(data)
+                with self.assertRaisesRegex(init.CheckFailed, reason):
+                    init.check(self.ftp, "initialize")
+                self.assertEqual(self.marker.read_bytes(), data)
+                self.assertEqual(self.ftp.writes, 0)
+
+    def test_initialize_does_not_write_for_other_preflight_errors(self):
+        self.marker.unlink()
+        for command, error in (
+            ("TYPE", ftplib.error_perm("550 private")),
+            ("RETR", ftplib.error_perm("553 private")),
+            ("RETR", ftplib.error_temp("450 private")),
+        ):
+            with self.subTest(command=command, error=error):
+                self.ftp.last_command = command
+                self.ftp.retrbinary = Mock(side_effect=error)
+                with self.assertRaisesRegex(init.CheckFailed, "RETR failed") as failure:
+                    init.check(self.ftp, "initialize")
+                self.assertNotIn("private", str(failure.exception))
+                self.assertEqual(self.ftp.writes, 0)
+
+    def test_initialize_requires_exact_marker_in_fresh_session(self):
+        for outcome, reason in (
+            ("saved", None),
+            ("discarded", "MLSD did not list the marker and RETR failed"),
+            ("different-path", "MLSD did not list the marker and RETR failed"),
+            ("hidden", "The listing and direct read disagree"),
+            ("changed", "differs from the required bytes"),
+        ):
+            with self.subTest(outcome=outcome):
+                self.marker.unlink(missing_ok=True)
+                writer = LocalFTP(self.root)
+                reader = LocalFTP(self.root)
+
+                def store(command, stream):
+                    self.assertEqual(command, f"STOR {PRIVATE}/{init.MARKER}")
+                    self.assertEqual(stream.read(), deploy.SITE)
+                    if outcome == "different-path":
+                        writer.path(f"/{init.MARKER}").write_bytes(deploy.SITE)
+                    elif outcome != "discarded":
+                        self.marker.write_bytes(b"changed" if outcome == "changed" else deploy.SITE)
+                    return "226 Transfer complete"
+
+                writer.storbinary = Mock(side_effect=store)
+                if outcome == "hidden":
+                    reader.mlsd = lambda path: [] if path == PRIVATE else LocalFTP.mlsd(reader, path)
+                output = StringIO()
+                with (
+                    patch.dict("os.environ", self.marker_env("initialize")),
+                    patch.object(deploy, "session", side_effect=[self.session_for(writer),
+                                                                 self.session_for(reader)]) as connect,
+                    redirect_stdout(output),
+                ):
+                    if reason:
+                        with self.assertRaisesRegex(init.CheckFailed, f"fresh session failed.*{reason}"):
+                            init.main()
+                        self.assertEqual(output.getvalue(), "")
+                    else:
+                        init.main()
+                        self.assertEqual(output.getvalue(), "Staging marker created and verified.\n")
+                self.assertEqual(connect.call_count, 2)
+                writer.storbinary.assert_called_once()
+                self.assertEqual(reader.writes, 0)
+
+    @contextmanager
+    def session_for(self, ftp):
+        yield ftp
+
     def test_check_cli_reports_listing_failure_as_not_ready(self):
         listing = self.ftp.mlsd
 
@@ -176,17 +272,7 @@ class FTPSRetry(unittest.TestCase):
 
         self.ftp.mlsd = unreadable_listing
         self.ftp.retrbinary = Mock()
-        env = {
-            "FTPS_MODE": "check",
-            "FTPS_TARGET": deploy.SITE.decode("ascii"),
-            "FTPS_WP_ROOT": init.WP_ROOT,
-            "FTPS_PRIVATE_DIR": init.PRIVATE,
-            "FTPS_HOST": "ftp.example.com",
-            "FTPS_PORT": "21",
-            "FTPS_USER": "user",
-            "FTPS_PASSWORD": "password",
-        }
-        with patch.dict("os.environ", env), patch.object(deploy, "session", return_value=self.connect()):
+        with patch.dict("os.environ", self.marker_env("check")), patch.object(deploy, "session", return_value=self.connect()):
             with self.assertRaisesRegex(
                 SystemExit, r"Staging is not ready for publication.*stage=backup-layout category=list"
             ) as failure:

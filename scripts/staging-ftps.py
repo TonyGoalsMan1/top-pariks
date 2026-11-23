@@ -38,6 +38,8 @@ class OperationFailed(Exception):
             match = re.match(r"([1-5][0-9]{2})(?=[ -]|$)", error.args[0])
             if match:
                 code = match[1]
+        self.command = command
+        self.reply_code = code
         super().__init__(
             f"stage={stage} category={category} command={command or 'none'} "
             f"reply={code or 'none'} error={type(error).__name__}"
