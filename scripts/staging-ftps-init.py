@@ -18,9 +18,9 @@ class CheckFailed(Exception):
     """A fixed diagnostic that is safe to show in Actions logs."""
 
 
-def entries(ftp, directory):
+def entries(ftp, directory, stage):
     result = {}
-    for name, facts in ftp.mlsd(directory):
+    for name, facts in deployment.listing(ftp, directory, stage):
         kind = facts.get("type")
         if kind in ("cdir", "pdir"):
             continue
@@ -38,26 +38,29 @@ def verify_marker(ftp, path):
             raise CheckFailed("The existing marker differs from the required bytes.")
         data.extend(chunk)
 
-    ftp.retrbinary(f"RETR {path}", collect)
+    with deployment.operation(ftp, "marker-check", "read"):
+        ftp.retrbinary(f"RETR {path}", collect)
     if data != SITE:
         raise CheckFailed("The existing marker differs from the required bytes.")
 
 
 def check(ftp, mode):
-    if ftp.pwd() != "/":
+    with deployment.operation(ftp, "login-directory", "inspect"):
+        login_directory = ftp.pwd()
+    if login_directory != "/":
         raise CheckFailed("The FTPS login directory must be /.")
-    root = entries(ftp, "/")
+    root = entries(ftp, "/", "account-layout")
     for directory in (WP_ROOT, PRIVATE):
         name = directory[1:]
         if root.get(name) != (name, "dir"):
             raise CheckFailed("The expected staging directories were not confirmed.")
 
-    wordpress = entries(ftp, WP_ROOT)
+    wordpress = entries(ftp, WP_ROOT, "wordpress-layout")
     for name, kind in (("wp-load.php", "file"), ("wp-content", "dir")):
         if wordpress.get(name) != (name, kind):
             raise CheckFailed("The expected WordPress layout was not confirmed.")
 
-    backup = entries(ftp, PRIVATE)
+    backup = entries(ftp, PRIVATE, "backup-layout")
     path = f"{PRIVATE}/{MARKER}"
     if MARKER in backup:
         if backup[MARKER] != (MARKER, "file"):
@@ -69,7 +72,8 @@ def check(ftp, mode):
         print("Staging FTPS layout verified. Marker absent from the directory listing.")
         return
 
-    ftp.storbinary(f"STOR {path}", BytesIO(SITE))
+    with deployment.operation(ftp, "marker-initialize", "write"):
+        ftp.storbinary(f"STOR {path}", BytesIO(SITE))
     verify_marker(ftp, path)
     print("Staging marker created and verified.")
 
@@ -97,6 +101,8 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except deployment.OperationFailed as error:
+        sys.exit(f"FTPS failed ({error}). See docs/STAGE-004.md.")
     except CheckFailed as error:
         sys.exit(f"{error} See docs/STAGE-003.md.")
     except (OSError, KeyError, ValueError, EOFError, ftplib.Error):
