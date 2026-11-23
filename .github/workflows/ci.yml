@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   syntax:
-    name: PHP, JavaScript, Bash and Python
+    name: PHP, JavaScript and Bash
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
