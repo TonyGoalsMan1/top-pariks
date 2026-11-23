@@ -1,0 +1,46 @@
+services:
+  db:
+    image: ${FACTORY_DB_IMAGE:?}
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD_FILE: /run/secrets/database_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/database_root_password
+    secrets: [database_password, database_root_password]
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  wordpress:
+    image: ${FACTORY_WP_IMAGE:?}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FACTORY_PORT:?}:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/database_password
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_ENVIRONMENT_TYPE', 'local');
+        define('DISABLE_WP_CRON', true);
+        define('AUTOMATIC_UPDATER_DISABLED', true);
+        define('WP_HTTP_BLOCK_EXTERNAL', true);
+        define('DISALLOW_FILE_MODS', true);
+    secrets: [database_password]
+    volumes:
+      - wp-data:/var/www/html
+      - ${FACTORY_RUNTIME:?}/wp-cli.phar:/opt/factory/wp-cli.phar:ro
+secrets:
+  database_password:
+    file: ${FACTORY_RUNTIME:?}/database-password
+  database_root_password:
+    file: ${FACTORY_RUNTIME:?}/database-root-password
+volumes:
+  wp-data:
+  db-data:
