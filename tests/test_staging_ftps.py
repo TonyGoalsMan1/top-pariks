@@ -1,4 +1,5 @@
 import ftplib
+import runpy
 import sys
 import tempfile
 import unittest
@@ -6,7 +7,7 @@ from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from importlib import import_module
 from io import StringIO
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -125,6 +126,73 @@ class FTPSRetry(unittest.TestCase):
         with redirect_stdout(StringIO()):
             init.check(self.ftp, "check")
             init.check(self.ftp, "initialize")
+        self.assertEqual(self.ftp.writes, 0)
+
+    def test_marker_not_listed_is_never_reported_as_ready(self):
+        listing = self.ftp.mlsd
+        self.ftp.mlsd = lambda path: [] if path == PRIVATE else listing(path)
+        read = self.ftp.retrbinary
+        for data, reason in (
+            (deploy.SITE, "The listing and direct read disagree"),
+            (deploy.SITE + b"\n", "differs from the required bytes"),
+            (None, "reply=550.*may be missing or inaccessible"),
+        ):
+            with self.subTest(reason=reason):
+                self.ftp.retrbinary = Mock(wraps=read)
+                if data is None:
+                    self.marker.unlink()
+                    self.ftp.retrbinary.side_effect = ftplib.error_perm("550 /sensitive/path")
+                else:
+                    self.marker.write_bytes(data)
+                with self.assertRaisesRegex(init.CheckFailed, reason) as failure:
+                    init.check(self.ftp, "check")
+                self.ftp.retrbinary.assert_called_once()
+                self.assertNotIn("sensitive", str(failure.exception))
+                self.assertEqual(self.ftp.writes, 0)
+
+    def test_invalid_listed_marker_is_rejected(self):
+        for name, kind, reason in (
+            (init.MARKER.upper(), "file", "capitalization"),
+            (init.MARKER, "dir", "unexpected entry"),
+        ):
+            with self.subTest(kind=kind):
+                listing = LocalFTP.mlsd
+                self.ftp.mlsd = lambda path: (
+                    [(name, {"type": kind})] if path == PRIVATE else listing(self.ftp, path)
+                )
+                self.ftp.retrbinary = Mock()
+                with self.assertRaisesRegex(init.CheckFailed, reason):
+                    init.check(self.ftp, "check")
+                self.ftp.retrbinary.assert_not_called()
+                self.assertEqual(self.ftp.writes, 0)
+
+    def test_check_cli_reports_listing_failure_as_not_ready(self):
+        listing = self.ftp.mlsd
+
+        def unreadable_listing(path):
+            if path == PRIVATE:
+                raise ftplib.error_perm("550 /sensitive/path")
+            yield from listing(path)
+
+        self.ftp.mlsd = unreadable_listing
+        self.ftp.retrbinary = Mock()
+        env = {
+            "FTPS_MODE": "check",
+            "FTPS_TARGET": deploy.SITE.decode("ascii"),
+            "FTPS_WP_ROOT": init.WP_ROOT,
+            "FTPS_PRIVATE_DIR": init.PRIVATE,
+            "FTPS_HOST": "ftp.example.com",
+            "FTPS_PORT": "21",
+            "FTPS_USER": "user",
+            "FTPS_PASSWORD": "password",
+        }
+        with patch.dict("os.environ", env), patch.object(deploy, "session", return_value=self.connect()):
+            with self.assertRaisesRegex(
+                SystemExit, r"Staging is not ready for publication.*stage=backup-layout category=list"
+            ) as failure:
+                runpy.run_path(init.__file__, run_name="__main__")
+        self.assertNotIn("sensitive", str(failure.exception))
+        self.ftp.retrbinary.assert_not_called()
         self.assertEqual(self.ftp.writes, 0)
 
     def test_marker_retry_after_lost_write_reply_does_not_overwrite(self):
