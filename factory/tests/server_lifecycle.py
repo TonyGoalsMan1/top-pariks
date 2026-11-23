@@ -3,6 +3,7 @@
 import contextlib
 import io
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -49,6 +50,7 @@ def start_s3(stack):
     import boto3
     from moto.server import ThreadedMotoServer
 
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
     port = free_port()
     s3 = ThreadedMotoServer(ip_address="127.0.0.1", port=port, verbose=False)
     s3.start()
@@ -196,7 +198,7 @@ def main():
             enable_test_s3(stack, first, root, ca, https_port)
         assert server.for_sites("backup", first.id) == 0
         assert not list(first.backups.iterdir())
-        result = server.restic(first, "snapshots", "--json", capture_output=True)
+        result = server.restic(first, "snapshots", "--json", stdout=subprocess.PIPE)
         (entry,) = json.loads(result.stdout)
         (backup_id,) = entry["tags"]
         assert re.fullmatch(server.BACKUP_ID, backup_id)

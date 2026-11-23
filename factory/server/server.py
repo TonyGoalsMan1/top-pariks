@@ -235,12 +235,24 @@ def package_upload(site, release):
     return manifest
 
 
-def receive():
+def clear_uploads(site):
+    for directory in site.root.glob("upload-*"):
+        if directory.is_dir() and not directory.is_symlink():
+            shutil.rmtree(directory)
+
+
+@contextlib.contextmanager
+def upload_directory(site):
+    clear_uploads(site)
+    with tempfile.TemporaryDirectory(dir=site.root, prefix="upload-") as temporary:
+        yield Path(temporary)
+
+
+def receive(*, wait=0):
     site = site_for((STATE / "staging-site").read_text().strip())
-    with site.lock(), tempfile.TemporaryDirectory(dir=site.root, prefix="upload-") as temporary:
+    with site.lock(timeout=wait), upload_directory(site) as release:
         if not site.provisioned.exists():
             raise FactoryError("Provision the staging site first")
-        release = Path(temporary)
         manifest = package_upload(site, release)
         if site.pending.exists() or site.maintenance.exists():
             raise FactoryError("Recovery required before deployment")
@@ -269,6 +281,8 @@ def receive():
 
 def site_operation(site, operation):
     with site.lock():
+        if operation in ("monitor", "recover"):
+            clear_uploads(site)
         if operation == "recover" or (operation in ("check", "monitor")
                                      and (site.pending.exists() or site.maintenance.exists())):
             recover(site)
@@ -400,7 +414,7 @@ def restore_copy(site, backup_id, remote):
         raise FactoryError("Invalid backup ID")
     with site.lock(), maintenance(site), quiet():
         result = restic(site, "snapshots", "--host", site.id, "--tag", backup_id, "--json",
-                        remote=remote, capture_output=True)
+                        remote=remote, stdout=subprocess.PIPE)
         snapshots = json.loads(result.stdout)
         if len(snapshots) != 1 or not re.fullmatch(r"[0-9a-f]{64}", snapshots[0]["id"]):
             raise FactoryError("Expected one matching encrypted snapshot")
@@ -451,6 +465,7 @@ def dispatch():
                 alert(site, "backup", False)
         except (Busy, SiteBusy):
             running.rename(job)
+            job.touch()
             event(f"Queue {job.stem}: site busy, task deferred")
             return
         except FAILURES as error:
@@ -504,7 +519,7 @@ def main():
         elif command == "receive":
             syslog.openlog("wordpress-factory-deploy", syslog.LOG_PID, syslog.LOG_AUTH)
             try:
-                receive()
+                receive(wait=90)
             except FAILURES as error:
                 syslog.syslog(syslog.LOG_ERR, f"Staging deployment failed ({type(error).__name__})")
                 if (STATE / "staging-site").is_file():

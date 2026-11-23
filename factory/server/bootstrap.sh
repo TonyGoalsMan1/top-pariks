@@ -19,31 +19,32 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y --no-install-recommends ca-certificates curl git python3 caddy restic openssh-server sudo rsync
 
-if ! docker compose version >/dev/null 2>&1; then
-    if ! command -v docker >/dev/null || dpkg -s docker.io >/dev/null 2>&1; then
-        if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
-            apt-get install -y docker.io docker-compose-v2
-        elif [[ $(apt-cache show docker-compose | awk '/^Version: / {print $2; exit}') == 2.* ]]; then
-            apt-get install -y docker.io docker-compose
-        elif ! command -v docker >/dev/null; then
-            install -d -m 0755 /etc/apt/keyrings
-            curl -fsS --proto '=https' "https://download.docker.com/linux/$ID/gpg" -o /etc/apt/keyrings/factory-docker.asc
-            chmod 0644 /etc/apt/keyrings/factory-docker.asc
-            printf 'deb [arch=%s signed-by=/etc/apt/keyrings/factory-docker.asc] https://download.docker.com/linux/%s %s stable\n' \
-                "$(dpkg --print-architecture)" "$ID" "$VERSION_CODENAME" > /etc/apt/sources.list.d/factory-docker.list
-            apt-get update -qq
-            apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-        else
-            echo 'Install Compose v2 for the existing Docker installation and run bootstrap again.' >&2
-            exit 1
-        fi
-    else
-        apt-get install -y docker-compose-plugin
-    fi
+if ! command -v docker >/dev/null; then
+    # Current Docker releases enforce loopback-only port bindings even for
+    # clients on the same L2 network. Some distro packages predate that fix.
+    apt-get install -y --no-install-recommends gnupg
+    install -d -m 0755 /etc/apt/keyrings
+    docker_key=$(mktemp)
+    trap 'rm -f -- "$docker_key"' EXIT
+    curl -fsS --proto '=https' "https://download.docker.com/linux/$ID/gpg" -o "$docker_key"
+    fingerprint=$(gpg --batch --show-keys --with-colons "$docker_key" | awk -F: '$1=="fpr" && !seen++ {print $10}')
+    [[ "$fingerprint" == 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]]
+    install -m 0644 "$docker_key" /etc/apt/keyrings/factory-docker.asc
+    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/factory-docker.asc] https://download.docker.com/linux/%s %s stable\n' \
+        "$(dpkg --print-architecture)" "$ID" "$VERSION_CODENAME" > /etc/apt/sources.list.d/factory-docker.list
+    apt-get update -qq
+    apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-compose-plugin
+elif ! docker compose version >/dev/null 2>&1; then
+    echo 'Install Compose v2 for the existing Docker installation and run bootstrap again.' >&2
+    exit 1
 fi
 docker compose version >/dev/null
 systemctl enable --now docker
-docker info >/dev/null
+engine_version=$(docker version --format '{{.Server.Version}}')
+[[ "${engine_version%%.*}" =~ ^[0-9]+$ && "${engine_version%%.*}" -ge 28 ]] || {
+    echo 'Docker Engine 28 or newer is required for loopback port isolation.' >&2
+    exit 1
+}
 
 install -d -m 0700 /var/lib/wordpress-factory
 # Serialize code installation with server operations.
@@ -88,7 +89,14 @@ if ! grep -qxF 'import /etc/caddy/WordPressFactory.caddy' /etc/caddy/Caddyfile; 
     if dpkg-query -W -f='${Conffiles}\n' caddy | awk '$1=="/etc/caddy/Caddyfile" {print $2}' |
         grep -qx "$(md5sum /etc/caddy/Caddyfile | cut -d ' ' -f1)"; then
         cp -an /etc/caddy/Caddyfile /etc/caddy/Caddyfile.distro
-        printf '%s\n' 'import /etc/caddy/WordPressFactory.caddy' > /etc/caddy/Caddyfile
+        cat > /etc/caddy/Caddyfile <<'CADDY'
+{
+    log {
+        exclude http.log.error
+    }
+}
+import /etc/caddy/WordPressFactory.caddy
+CADDY
     else
         printf '\n%s\n' 'import /etc/caddy/WordPressFactory.caddy' >> /etc/caddy/Caddyfile
     fi
