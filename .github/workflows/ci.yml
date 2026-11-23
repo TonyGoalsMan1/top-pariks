@@ -30,6 +30,8 @@ jobs:
         run: git ls-files -z -- '*.js' '*.cjs' '*.mjs' | xargs -0 -r -n 1 node --check
       - name: Check Bash syntax
         run: git ls-files -z -- '*.sh' | xargs -0 -r -n 1 bash -n
+      - name: Check staging FTPS Python syntax
+        run: python3 -m py_compile scripts/staging-ftps.py scripts/staging-ftps-init.py
 
   theme:
     name: WordPress theme and ZIP

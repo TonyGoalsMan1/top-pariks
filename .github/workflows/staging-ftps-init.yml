@@ -1,0 +1,58 @@
+name: TOP-PARIKS staging FTPS marker
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Enter https://top-pariks-test.freehosting.dev
+        type: string
+        required: true
+      mode:
+        description: Check the staging layout or initialize the marker
+        type: choice
+        options:
+          - check
+          - initialize
+        default: check
+        required: true
+      confirmation:
+        description: For initialize, enter the isolated account confirmation from STAGE-003
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: top-pariks-staging
+  cancel-in-progress: false
+
+jobs:
+  check-and-initialize:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      inputs.target == 'https://top-pariks-test.freehosting.dev' &&
+      (inputs.mode == 'check' ||
+        (inputs.mode == 'initialize' &&
+         inputs.confirmation == 'initialize top-pariks-test.freehosting.dev on an isolated account'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: staging-ftps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check Python syntax
+        run: python3 -m py_compile scripts/staging-ftps.py scripts/staging-ftps-init.py
+      - name: Check staging FTPS or initialize the marker
+        env:
+          FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          FTPS_PORT: ${{ secrets.STAGING_FTPS_PORT }}
+          FTPS_USER: ${{ secrets.STAGING_FTPS_USER }}
+          FTPS_PASSWORD: ${{ secrets.STAGING_FTPS_PASSWORD }}
+          FTPS_WP_ROOT: ${{ secrets.STAGING_FTPS_WP_ROOT }}
+          FTPS_PRIVATE_DIR: ${{ secrets.STAGING_FTPS_PRIVATE_DIR }}
+          FTPS_TARGET: ${{ inputs.target }}
+          FTPS_MODE: ${{ inputs.mode }}
+          FTPS_CONFIRMATION: ${{ inputs.confirmation }}
+        run: python3 scripts/staging-ftps-init.py
