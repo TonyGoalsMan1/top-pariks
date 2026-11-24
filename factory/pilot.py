@@ -90,8 +90,12 @@ def check(args):
         if project.executor == "responses":
             model_access(key, project.budget["model"], min(project.timeout, 20))
         print(f"{project.id}: {project.executor}, Git and configured dependencies ready", flush=True)
-    with Console(args.port, args.origin, state, projects, accounts):
-        pass
+    if args.dispatcher_only:
+        if not panel_ready(args):
+            raise QueueError("Start the pilot panel before the dispatcher")
+    else:
+        with Console(args.port, args.origin, state, projects, accounts):
+            pass
     print("Preflight passed: PWA assets, loopback API and SQLite ready", flush=True)
     return state
 
@@ -134,6 +138,22 @@ def wait_ready(process, ready, label):
     raise QueueError(f"{label} did not become ready")
 
 
+def panel_ready(args):
+    opener = build_opener(ProxyHandler({}))
+    host = args.origin.split("://", 1)[1]
+    try:
+        with opener.open(Request(f"http://127.0.0.1:{args.port}/manifest.webmanifest",
+                                 headers={"Host": host}), timeout=2) as response:
+            return response.status == 200
+    except URLError:
+        return False
+
+
+def dispatcher_command(args, state):
+    return [sys.executable, "-B", "-m", "factory.orchestrator", "--config", str(args.config.resolve()),
+            "--state", str(state), "run", "--workers", str(args.workers)]
+
+
 def serve(args, state):
     base = [sys.executable, "-B", "-m"]
     common = ["--config", str(args.config.resolve()), "--state", str(state)]
@@ -155,21 +175,9 @@ def serve(args, state):
                                 "--port", str(args.port), "--origin", args.origin],
                                env=web_env, start_new_session=True)
         processes.append(web)
-        opener = build_opener(ProxyHandler({}))
-        host = args.origin.split("://", 1)[1]
-
-        def panel_ready():
-            try:
-                with opener.open(Request(f"http://127.0.0.1:{args.port}/",
-                                         headers={"Host": host}), timeout=2) as response:
-                    return response.status == 200
-            except URLError:
-                return False
-
-        wait_ready(web, panel_ready, "Control center")
+        wait_ready(web, lambda: panel_ready(args), "Control center")
         started = time.time()
-        worker = subprocess.Popen([*base, "factory.orchestrator", *common, "run",
-                                   "--workers", str(args.workers)], start_new_session=True)
+        worker = subprocess.Popen(dispatcher_command(args, state), start_new_session=True)
         processes.append(worker)
 
         def worker_ready():
@@ -200,13 +208,17 @@ def main():
     parser.add_argument("--port", default=8787, type=int)
     parser.add_argument("--origin", help="Exact private HTTPS URL, defaults to loopback HTTP")
     parser.add_argument("--workers", default=2, type=int, choices=range(1, 17))
+    parser.add_argument("--dispatcher-only", action="store_true", help="Use an already running pilot panel")
     parser.add_argument("--check", action="store_true", help="Check prerequisites without running services")
     args = parser.parse_args()
     args.origin = args.origin or f"http://127.0.0.1:{args.port}"
     os.umask(0o077)
     try:
         state = check(args)
-        if not args.check:
+        if args.dispatcher_only and not args.check:
+            command = dispatcher_command(args, state)
+            os.execv(command[0], command)
+        elif not args.check:
             serve(args, state)
     except (QueueError, Critical, Retryable) as error:
         parser.exit(2, f"Pilot: {error}\n")

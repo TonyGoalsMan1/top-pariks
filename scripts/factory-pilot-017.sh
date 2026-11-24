@@ -73,8 +73,13 @@ case "${1:-}" in
     exec python3 -B -m factory.pilot --config "$pilot_home/projects.json" \
       --accounts "$pilot_home/accounts.json" --state "$pilot_home/state" --workers 1 "$@"
     ;;
+  panel)
+    shift
+    exec python3 -B -m factory.control --config "$pilot_home/projects.json" \
+      --accounts "$pilot_home/accounts.json" --state "$pilot_home/state" "$@"
+    ;;
   *)
-    echo "Usage: bash scripts/factory-pilot-017.sh {install|setup|codex|baseline|run}" >&2
+    echo "Usage: bash scripts/factory-pilot-017.sh {install|setup|codex|baseline|run|panel}" >&2
     exit 2
     ;;
 esac

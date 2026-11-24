@@ -84,6 +84,11 @@ def page(queue, project, before=None):
             "next": rows[19][0] if len(rows) > 20 else None}
 
 
+def dispatcher_online(queue):
+    heartbeat = queue.db.execute("SELECT heartbeat FROM runtime WHERE id=1").fetchone()
+    return heartbeat is not None and time.time() - heartbeat[0] < 8
+
+
 def dashboard(queue, state, project):
     listing = page(queue, project)
     health = queue.db.execute(
@@ -109,7 +114,6 @@ def dashboard(queue, state, project):
         "SUM(json_extract(e.detail,'$.estimated_microdollars')) "
         "FROM events e JOIN jobs j ON j.id=e.job WHERE j.project=? AND e.event='ai_usage'", (project.id,)
     ).fetchone()
-    heartbeat = queue.db.execute("SELECT heartbeat FROM runtime WHERE id=1").fetchone()
     codex_budget = {}
     if project.executor == "codex":
         calls = queue.db.execute(
@@ -124,7 +128,7 @@ def dashboard(queue, state, project):
         "business_roles": sorted(role for role in project.roles
                                  if "code" in project.permissions and ROLES[role]["permission"] == "edit"),
         "paused": queue.project_paused(project.id), "dispatcher_paused": queue.paused(),
-        "dispatcher_online": heartbeat is not None and time.time() - heartbeat[0] < 8,
+        "dispatcher_online": dispatcher_online(queue),
         "site": site_view(state, project, [task_view(queue, project, queue.job(health[0]))] if health else []),
         "budget": dict(pick(project.budget, {"model", "total_microdollars", "max_input_tokens", "max_output_tokens"}),
                        limit_microdollars=queue.budget_limit(project),
