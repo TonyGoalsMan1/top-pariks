@@ -37,7 +37,7 @@ case "${1:-}" in
     if flock -n 9; then
       nohup bash "$0" serve </dev/null >>"$log" 2>&1 &
     fi
-    printf 'Factory: Terminal → Run Task → Factory: Open pilot panel\n'
+    printf 'Factory panel: %s\n' "$origin"
     ;;
   serve)
     for attempt in {1..30}; do
@@ -47,7 +47,7 @@ case "${1:-}" in
       sleep 2
     done
     docker info --format '{{.ServerVersion}}'
-    "${pilot[@]}" install
+    "${pilot[@]}" install --panel-only
     "${pilot[@]}" setup --repository "$repository" --generate-password
     "${pilot[@]}" baseline
     exec env -u GH_TOKEN -u GITHUB_TOKEN -u FACTORY_GITHUB_TOKEN -u OPENAI_API_KEY \
@@ -71,6 +71,7 @@ case "${1:-}" in
     exit 1
     ;;
   login)
+    "${pilot[@]}" install
     install -d -m 700 "$CODEX_HOME"
     "${pilot[@]}" codex login --device-auth
     "${pilot[@]}" codex login status

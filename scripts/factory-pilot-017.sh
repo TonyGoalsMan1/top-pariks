@@ -8,8 +8,18 @@ export PATH="$pilot_home/tools/node_modules/.bin:/opt/homebrew/bin:$PATH"
 
 case "${1:-}" in
   install)
+    panel_only=false
+    case "${2:-}" in
+      '') ;;
+      --panel-only) panel_only=true ;;
+      *) echo "Usage: bash scripts/factory-pilot-017.sh install [--panel-only]" >&2; exit 2 ;;
+    esac
+    dependencies=(git gh curl)
+    if ! "$panel_only"; then
+      dependencies+=(npm)
+    fi
     packages=()
-    for name in git gh curl npm; do
+    for name in "${dependencies[@]}"; do
       command -v "$name" >/dev/null || packages+=("$name")
     done
     if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
@@ -35,13 +45,16 @@ case "${1:-}" in
       esac
     fi
     python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))'
-    if ! command -v codex >/dev/null || ! codex exec --help | grep -F -- '--ignore-user-config' >/dev/null; then
-      python3 -B -c 'import sys; from pathlib import Path; from factory.orchestrator.__main__ import private_state; private_state(Path(sys.argv[1]))' "$pilot_home"
-      npm install --prefix "$pilot_home/tools" --no-save --package-lock=false @openai/codex@0.172.0
-    fi
     if ! docker compose version >/dev/null 2>&1; then
       echo "Start your existing local Docker installation with Compose v2." >&2
       exit 2
+    fi
+    if "$panel_only"; then
+      exit 0
+    fi
+    if ! command -v codex >/dev/null || ! codex exec --help | grep -F -- '--ignore-user-config' >/dev/null; then
+      python3 -B -c 'import sys; from pathlib import Path; from factory.orchestrator.__main__ import private_state; private_state(Path(sys.argv[1]))' "$pilot_home"
+      npm install --prefix "$pilot_home/tools" --no-save --package-lock=false @openai/codex@0.172.0
     fi
     codex --version
     ;;

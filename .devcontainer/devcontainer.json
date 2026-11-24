@@ -16,5 +16,6 @@
     "8787": { "label": "Factory PWA", "protocol": "http", "onAutoForward": "silent" }
   },
   "otherPortsAttributes": { "onAutoForward": "ignore" },
-  "postStartCommand": "bash .devcontainer/pilot.sh start"
+  "postStartCommand": "bash .devcontainer/pilot.sh start",
+  "postAttachCommand": "bash .devcontainer/pilot.sh start"
 }
