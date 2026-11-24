@@ -19,11 +19,12 @@ from .control.__main__ import ASSETS, STATIC, Console, users
 from .orchestrator.__main__ import private_state
 from .orchestrator.executors import Critical, Retryable, api_key, model_access
 from .orchestrator.integrations import Integrations, timeout_command
-from .orchestrator.projects import load
+from .orchestrator.projects import integer, load
 from .orchestrator.queue import Queue, QueueError
 
 
 def check(args):
+    integer(args.port, 1024, 65535)
     state = private_state(args.state)
     projects = load(args.config.resolve())
     if not projects:
@@ -180,7 +181,7 @@ def main():
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--accounts", required=True, type=Path)
     parser.add_argument("--state", required=True, type=Path)
-    parser.add_argument("--port", default=8787, type=int, choices=range(1024, 65536), metavar="PORT")
+    parser.add_argument("--port", default=8787, type=int)
     parser.add_argument("--origin", help="Exact private HTTPS URL, defaults to loopback HTTP")
     parser.add_argument("--workers", default=2, type=int, choices=range(1, 17))
     parser.add_argument("--check", action="store_true", help="Check prerequisites without running services")

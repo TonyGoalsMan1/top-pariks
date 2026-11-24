@@ -19,7 +19,7 @@
 ## Запуск на компьютере владельца
 
 - **Windows.** Используйте Ubuntu в WSL2, Docker Desktop с интеграцией этой дистрибуции и Unix-сокет Docker. Держите checkout и приватное состояние в файловой системе WSL, например под `~`. Проверьте доступ к опубликованным loopback-портам из WSL. Для iPhone проксируйте порт через хост или приватную сеть с учётом режима сети WSL.
-- **macOS.** Используйте Python 3.11+, Git, Docker с Compose v2 и GNU coreutils (`brew install coreutils`, нужен `gtimeout`). Разрешите Docker доступ к каталогу состояния. На Apple Silicon проверьте доступность закреплённых Docker-образов для arm64.
+- **macOS.** Используйте Python 3.11+, Git, Docker с Compose v2 и GNU coreutils (`brew install coreutils`, нужен `gtimeout`). Разрешите Docker доступ к каталогу состояния. Манифесты закреплённых образов WordPress и MariaDB содержат linux/amd64 и linux/arm64. Запуск на физическом Mac и Windows в этой сессии не проверялся.
 - **Общее.** Нужны curl для Responses, GH CLI для удалённого GitHub, Node.js для редактируемого JS и PHP CLI для редактируемого PHP. Фоновая работа зависит от питания компьютера, запущенного Docker и доступа к сети. Используйте уже доступный Docker с подходящими для владельца условиями лицензии. Скрипты systemd/SSH из STAGE-013 предназначены для отдельного Linux-хоста.
 
 1. Создайте приватную директорию (`umask 077`, режим `0700`) вне Git. В ней сохраните `projects.json` и `accounts.json`. Начните с копии [примера реестра](../factory/orchestrator/projects.example.json), замените относительные пути на фактические. Профиль должен указывать на синтетический seed, уникальные ID и loopback-порт. Для запуска локального сайта используйте проверенный SHA из локальной ветки `base` репозитория `factory_source`. Значения для первого запуска можно сверить командами `git -C /path/to/fixture rev-parse main` и `docker compose version`.
@@ -51,13 +51,37 @@ Ctrl-C останавливает API и выдачу новых заданий.
 | Codex CLI с API key | `codex login --with-api-key` принимает ключ через stdin. Документация предусматривает `CODEX_API_KEY` для отдельного `codex exec` и SDK. Расход учитывается на API Platform. | Официальный путь для автоматизации Codex. |
 | Factory `executor: "responses"` | `OPENAI_API_KEY` отдельного API-проекта и явное `FACTORY_AUTHORIZE_PAID_AI=1`. Нужны доступ к выбранной модели и актуальные ставки в `budget`. Ключу нужен доступ к GET модели, счётчику токенов и Responses. | Существующий исполнитель подключён к очереди. Модель получает ограниченный контекст и возвращает строгое JSON-предложение. Сессия Codex хранится в Codex. Для подключения её к Factory потребуется отдельный адаптер с собственными лимитами и изоляцией. |
 
-Для этого этапа выбран существующий адаптер Responses. Он сохраняет ограничения расходов и не даёт модели shell или учётных данных GitHub. После отдельного согласия на расходы настройте модель и бюджет по [STAGE-014](STAGE-014.md), загрузите проектный ключ, выполните preflight, запустите launcher и начните с одной короткой задачи отчёта по синтетическому проекту. Проверьте `done`, журнал, usage и резерв. Просроченный ключ или отказ в доступе блокирует работу с диагностикой. Таймауты, проблемы сети и временные HTTP-ошибки обрабатываются ограниченными повторами. При блокировке исправьте причину, проверьте журнал, снимите аварийную паузу и поставьте повтор. В этом этапе вызовов модели и покупок не было.
+Для этого этапа выбран существующий адаптер Responses. Он сохраняет ограничения расходов и не даёт модели shell или учётных данных GitHub. После отдельного согласия на расходы настройте модель и бюджет по [STAGE-014](STAGE-014.md), загрузите проектный ключ, выполните preflight, запустите launcher и начните с одного отчёта в проекте, где разрешены `report` и роль `project-manager`.
+
+```bash
+python3 -B -m factory.orchestrator --config "$HOME/.factory-pilot/projects.json" \
+  --state "$HOME/.factory-pilot/state" submit fixture report 'Короткая сводка тестового README' --role project-manager
+```
+
+Проверьте `done`, журнал, usage и резерв. Просроченный ключ или отказ в доступе блокирует работу с диагностикой. Таймауты, проблемы сети и временные HTTP-ошибки обрабатываются ограниченными повторами. При блокировке исправьте причину, проверьте журнал, снимите аварийную паузу и поставьте повтор. В этом этапе вызовов модели и покупок не было.
 
 [OpenAI: аутентификация Codex](https://developers.openai.com/codex/auth) · [Codex exec](https://developers.openai.com/codex/noninteractive) · [Codex SDK](https://developers.openai.com/codex/sdk) · [Цены API](https://openai.com/api/pricing/)
 
 ## Реальная проверка GitHub
 
-В отдельном разрешённом репозитории с синтетическим `README.md` настройте тестовый workflow на push веток `factory/test-**` (`contents: read`, например одно задание с именем `fixture`, проверяющее наличие README). Это даёт Check Run на точном SHA ветки задачи. Выдайте токен только этому репозиторию с доступами Contents и Pull requests на запись и Checks на чтение, сохраните его в `FACTORY_GITHUB_TOKEN`. В профиле задайте `executor: "responses"`, `editable: ["README.md"]`, `github.trusted_test_ci: true`, `github.auto_merge: false` и `github.required_checks: ["fixture"]`. Используйте существующую тестовую базовую ветку.
+В отдельном разрешённом репозитории с синтетическим `README.md` настройте тестовый workflow на push веток `factory/test-**` (`contents: read`, например одно задание с именем `fixture`, проверяющее наличие README). Это даёт Check Run на точном SHA ветки задачи. Выдайте токен только этому репозиторию с доступами Contents и Pull requests на запись и Checks на чтение, сохраните его в `FACTORY_GITHUB_TOKEN`. В профиле задайте `executor: "responses"`, `editable: ["README.md"]`, `github.trusted_test_ci: true`, `github.auto_merge: false` и `github.required_checks: ["fixture"]`. Используйте существующую тестовую базовую ветку. Минимальный workflow в этом репозитории:
+
+```yaml
+name: Factory GitHub fixture
+on:
+  push:
+    branches: ['factory/test-*']
+permissions:
+  contents: read
+jobs:
+  fixture:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: grep -Eq '^Pilot [0-9a-f]{32}$' README.md
+```
 
 ```bash
 python3 -B -m factory.tests.github_pilot --config "$HOME/.factory-pilot/projects.json" \
@@ -68,7 +92,7 @@ python3 -B -m factory.tests.github_pilot --config "$HOME/.factory-pilot/projects
 
 ## Проверки и границы пилота
 
-На интеграционной ветке выполняются существующие `TOP-PARIKS CI` и `WordPress Factory`, включая серверный bootstrap на одноразовом runner. Локальные команды:
+Локально прошли 26 базовых тестов, 16 модульных тестов Factory и HTTP-сценарий launcher → API → SQLite → диспетчер → Git. Проверки итоговой ревизии, включая серверный bootstrap и WebKit iPhone, опубликованы в [Checks PR #36](https://github.com/TonyGoalsMan1/top-pariks/pull/36/checks). Локальные команды:
 
 ```bash
 python3 -B -m unittest discover -s tests -v
