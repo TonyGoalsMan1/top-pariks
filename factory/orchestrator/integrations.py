@@ -170,7 +170,7 @@ class Integrations:
             raise Retryable("GitHub has not reported the published head")
         return pr["number"]
 
-    def checks(self, head):
+    def check_states(self, head):
         output = json.loads(self.gh("api", f"repos/{self.project.slug}/commits/{head}/check-runs?per_page=100"))
         if output["total_count"] > 100:
             raise Critical("Too many GitHub checks to validate unambiguously")
@@ -181,7 +181,11 @@ class Integrations:
                 if item["name"] in checks:
                     raise Critical("Ambiguous GitHub check name")
                 checks[item["name"]] = item["conclusion"] if item["status"] == "completed" else None
-        pending = any(checks.get(name) is None for name in self.project.github["required_checks"])
+        return {name: checks.get(name) for name in self.project.github["required_checks"]}
+
+    def checks(self, head):
+        checks = self.check_states(head)
+        pending = any(status is None for status in checks.values())
         failed = {name: status for name, status in checks.items() if status and status != "success"}
         return pending, failed
 

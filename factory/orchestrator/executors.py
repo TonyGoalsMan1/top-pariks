@@ -65,7 +65,7 @@ def exchange(endpoint, key, payload, timeout, lease):
     return json.loads(data)
 
 
-def execute(project, job, role, data, reserve, lease, review=False):
+def execute(project, job, role, data, reserve, lease, review=False, record_usage=None):
     edit = ROLES[role]["permission"] == "edit"
     if project.executor == "mock":
         if review:
@@ -109,6 +109,11 @@ def execute(project, job, role, data, reserve, lease, review=False):
     if any(type(usage.get(key)) is not int or not 0 <= usage[key] <= budget[f"max_{key}"]
            for key in ("input_tokens", "output_tokens")):
         raise Critical("Responses usage exceeded the configured ceiling")
+    if record_usage is not None:
+        cost = (usage["input_tokens"] * budget["input_microdollars_per_million"]
+                + usage["output_tokens"] * budget["output_microdollars_per_million"]
+                + 999_999) // 1_000_000
+        record_usage(usage, cost)
     if response.get("status") != "completed":
         raise QueueError("Responses did not complete the proposal within its limits")
     for item in response["output"]:
