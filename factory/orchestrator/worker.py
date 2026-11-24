@@ -1,6 +1,7 @@
 """Advance durable tasks through execution, publication, checks and review."""
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+import hashlib
 import json
 import time
 
@@ -36,7 +37,15 @@ class Worker:
             finally:
                 queue.db.close()
 
-        outcome = execute(project, job, role, payload, reserve, self.lease, review=review)
+        def record_usage(usage, amount):
+            queue = Queue(self.db_path)
+            try:
+                queue.record_usage(job["id"], usage, amount)
+            finally:
+                queue.db.close()
+
+        outcome = execute(project, job, role, payload, reserve, self.lease,
+                          review=review, record_usage=record_usage)
         definition = schema(job["spec"]["operation"] == "code" and not review, review)
         if (not isinstance(outcome, dict) or set(outcome) != set(definition["required"])
                 or not isinstance(outcome["summary"], str)
@@ -61,6 +70,8 @@ class Worker:
             raise QueueError("Retry limit exhausted during restart recovery")
         tool = Integrations(project, self.state, job, self.lease)
         if spec["operation"] in FACTORY:
+            if hashlib.sha256(project.profile.read_bytes()).hexdigest() != project.profile_digest:
+                raise Critical("Factory profile changed since project registration")
             return next_step("done", phase, tool.factory())
         if result.get("ci_deadline", float("inf")) <= time.time():
             raise QueueError("GitHub publication, CI or review deadline exceeded")
@@ -87,7 +98,7 @@ class Worker:
             review = self.review(project, job, diff, {"git diff --check": "passed"})
             return next_step("done", phase, {"base": base, "head": head, "branch": tool.branch,
                                              "checkout": str(tool.checkout), "summary": outcome["summary"],
-                                             "review": review})
+                                             "review": review, "checks": {"git diff --check": "success"}})
 
         if phase == "publish":
             return next_step("queued", "ci", dict(result, pr=tool.publish(result)), 5)
@@ -98,11 +109,14 @@ class Worker:
                 raise Critical("Pull request merged before the orchestrator completed its review")
             return next_step("done", phase, dict(result, merged=True, merge_source="GitHub"))
         if phase == "ci":
-            pending, failures = tool.checks(result["head"])
+            checks = tool.check_states(result["head"])
+            result = dict(result, checks=checks, pr_state=pr["state"])
+            failures = {name: status for name, status in checks.items() if status not in {None, "success"}}
             if failures:
-                return self.retry(project, job, f"GitHub CI failed: {json.dumps(failures, sort_keys=True)}",
+                return self.retry(project, dict(job, result=result),
+                                  f"GitHub CI failed: {json.dumps(failures, sort_keys=True)}",
                                   phase="execute")
-            if pending:
+            if None in checks.values():
                 return next_step("queued", phase, result, 5)
             review = self.review(project, job, tool.diff(result["base"], result["head"]),
                                  {name: "success" for name in project.github["required_checks"]})
@@ -155,10 +169,21 @@ class Worker:
         return status, phase, result, delay, critical
 
     def run(self, queue, workers, once):
+        queue.heartbeat()
+        try:
+            self.dispatch(queue, workers, once)
+        finally:
+            queue.heartbeat(False)
+
+    def dispatch(self, queue, workers, once):
         queue.recover()
+        heartbeat_at = time.monotonic() + 2
         with ThreadPoolExecutor(max_workers=workers) as pool:
             active = {}
             while True:
+                if time.monotonic() >= heartbeat_at:
+                    queue.heartbeat()
+                    heartbeat_at = time.monotonic() + 2
                 while len(active) < workers:
                     job = queue.claim()
                     if not job:
