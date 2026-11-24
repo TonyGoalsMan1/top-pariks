@@ -28,9 +28,9 @@
     </section>
     <div id="workspace" hidden>
       <div class="workspace-bar">
-        <label>Проект <select id="projects"></select></label>
+        <label><span id="project-label">Проект</span><select id="projects" aria-labelledby="project-label"></select></label>
         <form id="register" hidden>
-          <label>Профиль из реестра <select name="project" required></select></label>
+          <label><span id="profile-label">Профиль из реестра</span><select name="project" aria-labelledby="profile-label" required></select></label>
           <button>Подключить</button>
         </form>
       </div>
@@ -60,8 +60,8 @@
               <h2>Новая бизнес-задача</h2>
               <form id="business">
                 <label>Что нужно сделать? <textarea name="objective" required maxlength="8000" rows="3" placeholder="Например, уточнить подписи в каталоге"></textarea></label>
-                <div class="form-row"><label>Роль <select name="role" required></select></label><label>Приоритет <input name="priority" type="number" min="-100" max="100" value="0" required></label></div>
-                <label>После задачи <select name="after"></select></label>
+                <div class="form-row"><label><span id="role-label">Роль</span><select name="role" aria-labelledby="role-label" required></select></label><label>Приоритет <input name="priority" type="number" min="-100" max="100" value="0" required></label></div>
+                <label><span id="dependency-label">После задачи</span><select name="after" aria-labelledby="dependency-label"></select></label>
                 <button class="primary">Добавить в очередь</button>
               </form>
             </section>
@@ -77,9 +77,9 @@
               <h2>Стенд и резервные копии</h2>
               <dl id="site-status"></dl>
               <form id="operations" hidden>
-                <label>Операция <select name="operation" required></select></label>
+                <label><span id="operation-label">Операция</span><select name="operation" aria-labelledby="operation-label" required></select></label>
                 <label id="ref-field" hidden>Полный Git SHA <input name="ref" pattern="[a-f0-9]{40}" maxlength="40" autocapitalize="none"></label>
-                <label id="backup-field" hidden>Снимок <select name="backup"></select></label>
+                <label id="backup-field" hidden><span id="backup-label">Снимок</span><select name="backup" aria-labelledby="backup-label"></select></label>
                 <button>Поставить операцию в очередь</button>
               </form>
               <h3>Снимки Factory</h3><ul id="backups" class="records"></ul>

@@ -19,6 +19,8 @@ body { margin: 0; }
 .brand small { display: block; font-weight: 500; color: #cbd9ec; }
 #identity { display: flex; gap: .75rem; align-items: center; overflow-wrap: anywhere; }
 #username { display: none; }
+#logout { background: transparent; color: white; border-color: #8ea4c3; }
+#logout:hover { background: #264161; }
 main { width: min(100%, 83rem); margin: auto; padding: 1rem max(1rem, env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 h1, h2, h3, p { margin: 0; }
 h1 { font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.1; letter-spacing: -.035em; overflow-wrap: anywhere; }
