@@ -101,9 +101,18 @@ def setup(args, home):
         raise QueueError("Existing directory is bound to a different test repository or seed")
     accounts = home / "accounts.json"
     if not accounts.exists() and not args.seed_only:
-        password = getpass("New PWA owner password (at least 12 characters): ")
-        if not 12 <= len(password) <= 256 or password != getpass("Repeat password: "):
-            raise QueueError("Use a matching password of 12–256 characters")
+        if args.generate_password:
+            password_file = home / "owner-password"
+            if not password_file.exists():
+                with password_file.open("x", encoding="utf-8") as output:
+                    output.write(secrets.token_urlsafe(24) + "\n")
+            password = password_file.read_text().strip()
+            if not re.fullmatch(r"[a-zA-Z0-9_-]{32}", password):
+                raise QueueError("Invalid generated PWA password file")
+        else:
+            password = getpass("New PWA owner password (at least 12 characters): ")
+            if not 12 <= len(password) <= 256 or password != getpass("Repeat password: "):
+                raise QueueError("Use a matching password of 12–256 characters")
         salt = secrets.token_bytes(16)
         write_json(accounts, {"owner": {"owner": True, "salt": salt.hex(),
                                         "hash": password_hash(password, salt)}})
@@ -143,7 +152,9 @@ def main():
     parser.add_argument("--repository", required=True, help="New private GitHub OWNER/REPO for synthetic data")
     parser.add_argument("--home", type=Path, default=Path.home() / ".factory-pilot-017")
     parser.add_argument("--wordpress-port", type=int, default=8181)
-    parser.add_argument("--seed-only", action="store_true", help="Generate fixture and profile without password prompt")
+    account = parser.add_mutually_exclusive_group()
+    account.add_argument("--seed-only", action="store_true", help="Generate fixture and profile without password prompt")
+    account.add_argument("--generate-password", action="store_true", help="Save a generated PWA password in private runtime state")
     parser.add_argument("--publish", action="store_true", help="Create the new private repo and push the trusted seed")
     args = parser.parse_args()
     os.umask(0o077)

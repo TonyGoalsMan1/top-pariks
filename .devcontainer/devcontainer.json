@@ -1,0 +1,21 @@
+{
+  "name": "Factory STAGE-017",
+  "build": { "dockerfile": "Dockerfile" },
+  "remoteUser": "vscode",
+  "hostRequirements": { "cpus": 2 },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:4.1.3": {
+      "dockerDashComposeVersion": "v2",
+      "installDockerBuildx": false
+    },
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [8787],
+  "portsAttributes": {
+    "8787": { "label": "Factory PWA", "protocol": "http", "onAutoForward": "silent" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "ignore" },
+  "postStartCommand": "bash .devcontainer/pilot.sh start",
+  "postAttachCommand": "bash .devcontainer/pilot.sh start"
+}

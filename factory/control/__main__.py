@@ -22,7 +22,7 @@ from factory.orchestrator.__main__ import private_state
 from factory.orchestrator.projects import IDENTIFIER, integer, load
 from factory.orchestrator.queue import Queue, QueueError, encode
 
-from .views import OPERATIONS, dashboard, events, page, task_view
+from .views import OPERATIONS, dashboard, dispatcher_online, events, page, task_view
 
 
 STATIC = Path(__file__).with_name("static")
@@ -92,7 +92,7 @@ class Console(ThreadingHTTPServer):
     request_queue_size = 32
     allow_reuse_address = True
 
-    def __init__(self, port, origin, state, projects, accounts):
+    def __init__(self, port, origin, state, projects, accounts, *, require_dispatcher=False):
         parsed = urlsplit(origin)
         if (not parsed.hostname or parsed.username or parsed.password or parsed.path or parsed.query
                 or parsed.fragment or origin != f"{parsed.scheme}://{parsed.netloc.lower()}"
@@ -106,6 +106,7 @@ class Console(ThreadingHTTPServer):
         self.db_path = state / "queue.sqlite3"
         self.projects = projects
         self.accounts = accounts
+        self.require_dispatcher = require_dispatcher
         self.sessions = {}
         self.failed = deque()
         self.lock = threading.Lock()
@@ -335,6 +336,10 @@ class Handler(BaseHTTPRequestHandler):
         return queue.job(task)
 
     def mutate(self, queue, actor, project, action, body, owner, task_route):
+        if (self.server.require_dispatcher and (action in {"business", "operations"}
+                                                or (task_route and task_route[2] in {"retry", "release", "approve"}))
+                and not dispatcher_online(queue)):
+            raise HTTPError(409, "Запустите диспетчер пилота после разрешения владельца")
         if action == "budget":
             if not owner:
                 raise HTTPError(403, "Требуется разрешение владельца")
@@ -402,6 +407,7 @@ def main():
     parser.add_argument("--state", type=Path)
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--origin")
+    parser.add_argument("--require-dispatcher", action="store_true", help="Require a live dispatcher for task submission")
     args = parser.parse_args()
     if args.hash_password:
         password = getpass("Password: ")
@@ -419,7 +425,8 @@ def main():
         if any(project.github.get("auto_merge") for project in projects.values()):
             raise QueueError("The control center requires a registry with automatic merge disabled")
         accounts = users(args.accounts.resolve(), projects)
-        with Console(args.port, args.origin, state, projects, accounts) as server:
+        with Console(args.port, args.origin, state, projects, accounts,
+                     require_dispatcher=args.require_dispatcher) as server:
             print(f"WordPress Factory Control Center listening on 127.0.0.1:{args.port}", flush=True)
             server.serve_forever()
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error) as error:
