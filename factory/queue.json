@@ -104,14 +104,15 @@
       "depends_on": [
         "autonomous-orchestrator"
       ],
-      "status": "running",
+      "status": "done",
       "criteria": [
         "Submit and control real queued jobs from a mobile PWA on two isolated projects.",
         "Enforce project permissions, exact approvals and budget ceilings; reuse Factory recovery.",
         "Exercise HTTP integration and the iPhone WebKit viewport alongside existing checks."
       ],
       "retry_policy": "read_only",
-      "verify": "python3 -B factory/tests/control_lifecycle.py --wordpress --browser and STAGE-015 PR checks"
+      "verify": "python3 -B factory/tests/control_lifecycle.py --wordpress --browser and STAGE-015 PR checks",
+      "evidence": [45334470942, 45334470930]
     }
   ]
 }
