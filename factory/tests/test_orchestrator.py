@@ -101,6 +101,39 @@ class RemoteContracts(unittest.TestCase):
             adapter.merge({}, {})
         self.assertEqual(adapter.gh.call_count, 2)
 
+    def test_merge_uses_the_reviewed_head_after_rechecking_ci(self):
+        head = "b" * 40
+        project = SimpleNamespace(slug="sample/repo", base="main", github={
+            "required_checks": ["one"], "reviewer": "reviewer",
+        })
+        adapter = Integrations(project, Path("/test"), {"id": "a" * 32}, 0)
+        adapter.gh = Mock(side_effect=map(json.dumps, [
+            {"protected": True},
+            {"enforce_admins": {"enabled": True},
+             "required_status_checks": {"strict": True, "contexts": ["one"]},
+             "required_pull_request_reviews": {"dismiss_stale_reviews": True,
+                                               "require_last_push_approval": True,
+                                               "required_approving_review_count": 1}},
+            {"login": "dispatcher"},
+            [{"user": {"login": "reviewer"}, "state": "APPROVED", "commit_id": head}],
+            {"merged": True},
+        ]))
+        adapter.checks = Mock(return_value=(False, {}))
+        adapter.pull_status = Mock(return_value={"mergeStateStatus": "CLEAN"})
+        result = {"head": head}
+        self.assertTrue(adapter.merge({"number": 3, "author": {"login": "author"}}, result))
+        adapter.checks.assert_called_once_with(head)
+        self.assertEqual(adapter.gh.call_args.args, (
+            "api", "--method", "PUT", "repos/sample/repo/pulls/3/merge",
+            "-f", f"sha={head}", "-f", "merge_method=squash",
+        ))
+
+    def test_file_proposal_cannot_escape_the_allowlist(self):
+        project = SimpleNamespace(editable={"fixture.js"})
+        adapter = Integrations(project, Path("/test"), {"id": "a" * 32}, 0)
+        with self.assertRaisesRegex(Critical, "unauthorized"):
+            adapter.apply([{"path": "../../fixture.js", "content": "ignored"}], "base")
+
     def test_factory_backup_uses_the_emitted_identifier(self):
         with tempfile.TemporaryDirectory() as state:
             project = SimpleNamespace(profile="fixture.json", factory_source="/fixture")

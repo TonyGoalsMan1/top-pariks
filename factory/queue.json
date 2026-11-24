@@ -90,7 +90,7 @@
       "depends_on": [
         "server-infrastructure"
       ],
-      "status": "pending",
+      "status": "done",
       "criteria": [
         "Drain a persistent, permissioned queue on two isolated Git and WordPress projects.",
         "Verify bounded retry, restart recovery, independent review, Factory health and rejected operations.",

@@ -57,14 +57,14 @@ class Worker:
     def step(self, project, job):
         phase, result = job["phase"], job["result"]
         spec = job["spec"]
+        if phase == "execute" and job["attempt"] > project.max_attempts:
+            raise QueueError("Retry limit exhausted during restart recovery")
         tool = Integrations(project, self.state, job, self.lease)
         if spec["operation"] in FACTORY:
             return next_step("done", phase, tool.factory())
         if result.get("ci_deadline", float("inf")) <= time.time():
             raise QueueError("GitHub publication, CI or review deadline exceeded")
         if phase == "execute":
-            if job["attempt"] > project.max_attempts:
-                raise QueueError("Retry limit exhausted during restart recovery")
             base = tool.ensure_checkout(result)
             payload = tool.payload()
             queue = Queue(self.db_path)
