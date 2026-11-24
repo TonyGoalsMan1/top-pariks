@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS events (
     seq INTEGER PRIMARY KEY, job TEXT REFERENCES jobs(id), time REAL NOT NULL,
     event TEXT NOT NULL, detail TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS jobs_project_created ON jobs(project, created, id);
+CREATE INDEX IF NOT EXISTS events_job_seq ON events(job, seq);
 CREATE TABLE IF NOT EXISTS control (
     id INTEGER PRIMARY KEY CHECK (id = 1), paused INTEGER NOT NULL DEFAULT 0
 );

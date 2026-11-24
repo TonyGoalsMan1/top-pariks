@@ -1,6 +1,7 @@
 """Advance durable tasks through execution, publication, checks and review."""
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+import hashlib
 import json
 import time
 
@@ -69,6 +70,8 @@ class Worker:
             raise QueueError("Retry limit exhausted during restart recovery")
         tool = Integrations(project, self.state, job, self.lease)
         if spec["operation"] in FACTORY:
+            if hashlib.sha256(project.profile.read_bytes()).hexdigest() != project.profile_digest:
+                raise Critical("Factory profile changed since project registration")
             return next_step("done", phase, tool.factory())
         if result.get("ci_deadline", float("inf")) <= time.time():
             raise QueueError("GitHub publication, CI or review deadline exceeded")

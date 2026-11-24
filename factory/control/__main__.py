@@ -242,6 +242,8 @@ class Handler(BaseHTTPRequestHandler):
             self.json(503, {"error": "Очередь временно недоступна"})
         except (ConnectionError, TimeoutError):
             return
+        except OSError:
+            self.json(503, {"error": "Состояние панели временно недоступно"})
 
     def api(self, queue, path, body):
         if path == "session" and body is not None:
@@ -251,9 +253,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise HTTPError(401, "Неверный логин или пароль")
             try:
                 token = self.server.sign_in(actor, password)
-            except HTTPError:
-                with queue.transaction():
-                    audit(queue, "anonymous", None, "login_rejected")
+            except HTTPError as error:
+                if error.status == 401:
+                    with queue.transaction():
+                        audit(queue, "anonymous", None, "login_rejected")
                 raise
             with queue.transaction():
                 audit(queue, actor, None, "login")

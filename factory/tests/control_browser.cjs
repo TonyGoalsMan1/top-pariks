@@ -2,10 +2,21 @@
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { setTimeout: delay } = require('node:timers/promises');
 const { chromium, webkit, devices } = require('playwright-core');
 
 const [origin, password] = process.argv.slice(2);
 const output = process.env.FACTORY_BROWSER_ARTIFACTS;
+
+async function poll(probe, message) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const result = await probe();
+    if (result) return result;
+    await delay(150);
+  }
+  throw new Error(message);
+}
 
 async function layout(page, width) {
   await page.setViewportSize({ width, height: 850 });
@@ -59,15 +70,19 @@ async function exercise(browser, device, name) {
     await page.getByRole('button', { name: 'Повторить задачу', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Возобновить очередь', exact: true }).click();
     const codeTask = tasks.find((task) => task.spec.operation === 'code');
-    await page.waitForFunction(async (id) => {
-      const response = await fetch('/api/v1/projects/alpha/tasks/' + id);
+    await poll(async () => {
+      const response = await context.request.get(origin + '/api/v1/projects/alpha/tasks/' + codeTask.dependencies[0]);
       return (await response.json()).status === 'done';
-    }, codeTask.dependencies[0]);
-    await page.getByRole('button', { name: 'Повторить задачу', exact: true }).click();
+    }, 'The live worker did not complete the prerequisite after resume');
+    const [retry] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/tasks/' + codeTask.id + '/retry')),
+      page.getByRole('button', { name: 'Повторить задачу', exact: true }).click(),
+    ]);
+    assert.equal(retry.status(), 201, await retry.text());
     await page.locator('#task-detail').getByText('Mock file proposal', { exact: true }).waitFor();
     await page.locator('#task-detail').getByText('CI · git diff --check', { exact: true }).waitFor();
     await page.locator('#task-detail summary').click();
-    await page.locator('#task-detail').getByText('Этап начат', { exact: true }).first().waitFor();
+    await page.locator('#task-detail li').filter({ hasText: 'Этап начат' }).first().waitFor();
 
     if (process.env.FACTORY_WORDPRESS_TEST === '1') {
       await page.getByLabel('Операция', { exact: true }).selectOption('backup');
@@ -80,12 +95,13 @@ async function exercise(browser, device, name) {
       });
     }
 
-    await page.waitForFunction(async () => Boolean((await navigator.serviceWorker.ready).active));
-    const cacheKeys = await page.evaluate(async () => {
+    const cacheKeys = await poll(() => page.evaluate(async () => {
       const names = await caches.keys();
+      if (names.length === 0) return null;
       const requests = await Promise.all(names.map(async (cache) => (await caches.open(cache)).keys()));
-      return requests.flat().map((request) => new URL(request.url).pathname);
-    });
+      const keys = requests.flat().map((request) => new URL(request.url).pathname);
+      return keys.length ? keys : null;
+    }), 'The service worker did not populate the PWA cache');
     assert(cacheKeys.includes('/manifest.webmanifest') && cacheKeys.every((url) => !url.startsWith('/api/')),
       'PWA cache is missing the shell or contains API data');
     if (output) {
@@ -107,6 +123,9 @@ async function exercise(browser, device, name) {
     assert.equal(await page.getByLabel('Проект', { exact: true }).locator('option').count(), 1);
     assert.deepEqual(errors, []);
     console.log('Browser integration passed: ' + name);
+  } catch (error) {
+    console.error(await page.locator('#feedback').textContent(), await page.locator('#task-detail').innerText());
+    throw error;
   } finally {
     await context.close();
   }
