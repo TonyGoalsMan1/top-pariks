@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from orchestrator.executors import Critical, Retryable, execute, model_access
+from orchestrator import codex
 from orchestrator.integrations import Integrations
 from orchestrator.queue import Queue, QueueError
 
@@ -72,8 +73,36 @@ class Scheduler(unittest.TestCase):
         self.queue.set_budget_cap(self.alpha.id, 100)
         self.assertEqual(self.queue.budget_limit(self.alpha), 10)
 
+    def test_codex_call_ceiling_keeps_unknown_cost(self):
+        self.alpha.budget["max_calls"] = 1
+        job, = self.queue.add(self.alpha, [{"operation": "code", "critical": False}], 0, [])
+        self.queue.reserve_codex(self.alpha, job)
+        with self.assertRaises(QueueError):
+            self.queue.reserve_codex(self.alpha, job)
+        self.queue.record_usage(job, {"input_tokens": 10, "output_tokens": 20}, None)
+        events = self.queue.history(job)
+        self.assertEqual(events[-2]["detail"], {"calls_reserved": 1})
+        self.assertIsNone(events[-1]["detail"]["estimated_microdollars"])
+
+    def test_interrupted_preview_requires_factory_recovery(self):
+        job, = self.queue.add(self.alpha, [{"operation": "code", "critical": False}], 0, [])
+        self.queue.claim()
+        self.queue.finish(job, "queued", "preview", {"head": "reviewed"})
+        self.assertEqual(self.queue.claim()["phase"], "preview")
+        self.queue.recover()
+        self.assertTrue(self.queue.paused())
+        self.assertEqual(self.queue.job(job)["status"], "blocked")
+        with self.assertRaises(QueueError):
+            self.queue.retry_job(self.alpha, job)
+
 
 class RemoteContracts(unittest.TestCase):
+    def test_codex_refuses_before_login_or_execution_without_consent(self):
+        with patch.dict("os.environ", {}, clear=True), patch("orchestrator.codex.run") as run:
+            with self.assertRaisesRegex(Critical, "explicit owner authorization"):
+                codex.check(Path("/tmp"))
+            run.assert_not_called()
+
     def test_responses_authorization_and_token_ceiling(self):
         project = SimpleNamespace(executor="responses", timeout=5, budget={
             "model": "configured-model", "max_input_tokens": 100, "max_output_tokens": 50,

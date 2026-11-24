@@ -23,7 +23,7 @@ from artifacts import (
     BACKUP_FILES, FactoryError, archive_path, build_release, file_record, read_json,
     verify_backup, verify_release, write_json,
 )
-from health import health
+from health import health, verify_stylesheet
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -364,7 +364,7 @@ def recover_failure(site, error):
     raise FactoryError("Operation failed and the site was recovered") from error
 
 
-def deploy(site, directory):
+def deploy(site, directory, stylesheet_sha256=None):
     with release_tar(site, directory) as theme:
         health(site)
         site.stop_web()
@@ -378,6 +378,8 @@ def deploy(site, directory):
             install_theme(site, theme)
             site.start_web()
             health(site)
+            if stylesheet_sha256:
+                verify_stylesheet(site, stylesheet_sha256)
         except ERRORS as error:
             recover_failure(site, error)
         site.pending.unlink()
@@ -422,7 +424,10 @@ def arguments():
     build.add_argument("output", type=Path)
     build.add_argument("--ref", default="HEAD")
     for command in ("start", "deploy", "verify-release"):
-        commands.add_parser(command).add_argument("release", type=Path)
+        action = commands.add_parser(command)
+        action.add_argument("release", type=Path)
+        if command == "deploy":
+            action.add_argument("--stylesheet-sha256")
     for command in ("restore", "verify-backup"):
         commands.add_parser(command).add_argument("backup_id")
     for command in ("health", "backup", "rollback", "stop"):
@@ -469,7 +474,9 @@ def main():
         elif args.command == "health":
             health(site)
         elif args.command == "deploy":
-            deploy(site, args.release)
+            if args.stylesheet_sha256 and not re.fullmatch(SHA256, args.stylesheet_sha256):
+                raise FactoryError("Invalid expected stylesheet SHA-256")
+            deploy(site, args.release, args.stylesheet_sha256)
         elif args.command == "backup":
             health(site)
             site.stop_web()

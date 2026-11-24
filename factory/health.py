@@ -1,6 +1,7 @@
 """WordPress runtime and storefront checks with an isolated cookie jar."""
 
 import http.cookiejar
+import hashlib
 import re
 import time
 import urllib.error
@@ -73,3 +74,11 @@ def health(site):
         if site.wp("option", "get", option, "--skip-themes", capture=True) != site.url:
             raise FactoryError(f"Unexpected WordPress {option}")
     storefront(site)
+
+
+def verify_stylesheet(site, expected):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), LocalRedirects(site.url))
+    url = f"{site.url}/wp-content/themes/{site.slug}/style.css"
+    with opener.open(url, timeout=10) as response:
+        if response.status != 200 or hashlib.sha256(response.read(64 * 1024 + 1)).hexdigest() != expected:
+            raise FactoryError("Served stylesheet does not match the reviewed commit")

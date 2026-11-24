@@ -48,6 +48,7 @@ class Project:
         self.queue = config.get("queue", [])
         self.executor = config["executor"]
         self.github = config.get("github", {})
+        self.preview_base = config.get("preview_base")
         self.budget = config["budget"]
         self.timeout = integer(config.get("timeout_seconds", 120), 1, 900)
         self.max_attempts = integer(config.get("max_attempts", 3), 1, 5)
@@ -61,7 +62,7 @@ class Project:
                 or self.base.lower() == "production" or self.environments != ["test"]
                 or not re.fullmatch(r"[a-z0-9.-]+\.test|localhost", self.domain)
                 or self.site_type not in {"wordpress", "woocommerce"}
-                or self.executor not in {"mock", "responses"}
+                or self.executor not in {"mock", "responses", "codex"}
                 or not self.permissions <= OPERATIONS or not self.roles <= ROLES.keys()):
             raise QueueError("Invalid project identity, test environment, permissions or executor")
         if self.executor == "mock" and self.github:
@@ -107,6 +108,15 @@ class Project:
                 raise QueueError("Invalid Factory site ID")
             config = dict(config, profile_sha256=self.profile_digest,
                           resolved_factory_source=str(self.factory_source))
+        if self.preview_base is not None:
+            css = profile["theme"]["source"] + "/style.css" if self.profile else None
+            if (not re.fullmatch(SHA, self.preview_base) or not self.github
+                    or self.github.get("auto_merge") or self.slug.lower() == "tonygoalsman1/top-pariks"
+                    or not self.profile or not {"code", "start", "health"} <= self.permissions
+                    or self.editable != {css}):
+                raise QueueError("Local preview requires a pinned test repository and CSS-only edits")
+        if self.executor == "codex":
+            integer(self.budget["max_calls"], 1, 20)
         if self.executor == "responses":
             integer(self.budget["total_microdollars"], 1, 1_000_000_000)
             integer(self.budget["max_input_tokens"], 1, 100_000)
@@ -118,7 +128,7 @@ class Project:
         self.fingerprint = hashlib.sha256(encode([config, self.repo, ROLES]).encode()).hexdigest()
 
     def resource(self, spec):
-        if spec["operation"] in FACTORY - {"build"}:
+        if self.preview_base or spec["operation"] in FACTORY - {"build"}:
             return f"site:{self.site_id}"
         return f"repository:{self.repo.lower() if self.github else self.repo}"
 
