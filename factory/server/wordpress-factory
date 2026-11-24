@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+cd /
+exec /usr/bin/python3 -I -B /usr/local/lib/wordpress-factory/factory/server/server.py "$@"

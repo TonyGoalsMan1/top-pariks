@@ -33,6 +33,10 @@ ERRORS = (FactoryError, OSError, ValueError, TypeError, KeyError, AttributeError
           subprocess.SubprocessError, tarfile.TarError, BadZipFile)
 
 
+class SiteBusy(FactoryError):
+    pass
+
+
 class Site:
     repo = REPO
 
@@ -53,7 +57,7 @@ class Site:
             "-f", str(REPO / "factory/compose.yaml"), "-p", f"factory-{self.id}-{scope}",
         ]
         self.env = dict(
-            os.environ, FACTORY_PORT=str(self.port), FACTORY_RUNTIME=str(self.runtime),
+            os.environ, FACTORY_ENVIRONMENT="local", FACTORY_PORT=str(self.port), FACTORY_RUNTIME=str(self.runtime),
             FACTORY_WP_IMAGE=self.config["wordpress_image"], FACTORY_DB_IMAGE=self.config["database_image"],
         )
         self.backup_profile = {key: self.config[key] for key in (
@@ -97,15 +101,20 @@ class Site:
         return resolved
 
     @contextlib.contextmanager
-    def lock(self):
+    def lock(self, *, timeout=0):
         self.root.mkdir(parents=True, exist_ok=True)
         if self.root.is_symlink() or self.root.stat().st_mode & 0o077:
             raise FactoryError("Site state must be a private directory (0700)")
         with (self.root / "operation.lock").open("a") as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError as error:
-                raise FactoryError(f"Another Factory operation owns {self.id}") from error
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError as error:
+                    if time.monotonic() >= deadline:
+                        raise SiteBusy(f"Another Factory operation owns {self.id}") from error
+                    time.sleep(1)
             profile = self.root / "profile.json"
             if profile.exists() and read_json(profile) != self.backup_profile:
                 raise FactoryError("Existing state belongs to a different site profile")

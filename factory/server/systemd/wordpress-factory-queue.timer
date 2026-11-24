@@ -1,0 +1,9 @@
+[Unit]
+Description=Dispatch WordPress Factory tasks
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=1min
+
+[Install]
+WantedBy=timers.target

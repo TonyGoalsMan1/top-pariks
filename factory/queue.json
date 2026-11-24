@@ -58,6 +58,32 @@
       "criteria": ["Run the disposable lifecycle on the new host.", "Verify private off-host copies and recovery before introducing real data."],
       "retry_policy": "state_change",
       "verify": "docs/STAGE-012.md"
+    },
+    {
+      "id": "server-infrastructure",
+      "depends_on": [
+        "github-ci"
+      ],
+      "status": "done",
+      "criteria": [
+        "Bootstrap and pinned SSH entry point for separate staging.",
+        "HTTPS proxy, isolated sites, encrypted backups, monitored rollback and task queue."
+      ],
+      "retry_policy": "state_change",
+      "verify": "factory/tests/server_bootstrap.sh and factory/tests/server_lifecycle.py"
+    },
+    {
+      "id": "server-activation",
+      "depends_on": [
+        "server-infrastructure"
+      ],
+      "status": "blocked",
+      "blocked_by": "Dedicated staging host, domain and private S3 bucket are owner-provided.",
+      "criteria": [
+        "Verify DNS and TLS, enable GitHub staging deployment and recover a private off-host copy."
+      ],
+      "retry_policy": "state_change",
+      "verify": "docs/STAGE-013.md"
     }
   ]
 }
