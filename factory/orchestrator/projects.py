@@ -91,18 +91,21 @@ class Project:
                 (self.reviewer not in {"qa", "security"} or self.reviewer not in self.roles)):
             raise QueueError("Code changes require a separate QA or security role")
         self.profile = None
+        self.profile_digest = None
         self.factory_source = None
         if self.permissions & FACTORY:
             self.profile = (directory / config["wordpress_profile"]).resolve(strict=True)
             self.factory_source = (directory / config["factory_source"]).resolve(strict=True)
-            profile = json.loads(self.profile.read_text())
+            raw_profile = self.profile.read_bytes()
+            profile = json.loads(raw_profile)
+            self.profile_digest = hashlib.sha256(raw_profile).hexdigest()
             if ("woocommerce" in profile) != (self.site_type == "woocommerce"):
                 raise QueueError("Project site type must match the Factory profile")
             self.site_id = profile["site_id"]
             self.port = integer(profile["port"], 1024, 65535)
             if not re.fullmatch(IDENTIFIER, self.site_id):
                 raise QueueError("Invalid Factory site ID")
-            config = dict(config, profile_sha256=hashlib.sha256(self.profile.read_bytes()).hexdigest(),
+            config = dict(config, profile_sha256=self.profile_digest,
                           resolved_factory_source=str(self.factory_source))
         if self.executor == "responses":
             integer(self.budget["total_microdollars"], 1, 1_000_000_000)

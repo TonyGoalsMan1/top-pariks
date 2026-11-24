@@ -61,6 +61,17 @@ class Scheduler(unittest.TestCase):
             self.queue.reserve(self.alpha, 5)
         self.queue.reserve(self.alpha, 4)
 
+    def test_owner_budget_cap_cannot_increase_registry_ceiling(self):
+        self.queue.set_budget_cap(self.alpha.id, 0)
+        with self.assertRaises(QueueError):
+            self.queue.reserve(self.alpha, 1)
+        self.queue.set_budget_cap(self.alpha.id, 4)
+        self.queue.reserve(self.alpha, 4)
+        with self.assertRaises(QueueError):
+            self.queue.reserve(self.alpha, 1)
+        self.queue.set_budget_cap(self.alpha.id, 100)
+        self.assertEqual(self.queue.budget_limit(self.alpha), 10)
+
 
 class RemoteContracts(unittest.TestCase):
     def test_responses_authorization_and_token_ceiling(self):
@@ -80,6 +91,25 @@ class RemoteContracts(unittest.TestCase):
                 execute(project, {}, "wordpress", {}, reserve, 0)
             reserve.assert_called_once_with(200)
             self.assertEqual(api.call_count, 1)
+
+    def test_responses_records_confirmed_token_usage(self):
+        project = SimpleNamespace(executor="responses", timeout=5, budget={
+            "model": "configured-model", "max_input_tokens": 100, "max_output_tokens": 50,
+            "input_microdollars_per_million": 1_000_000, "output_microdollars_per_million": 2_000_000,
+        })
+        usage = {"input_tokens": 80, "output_tokens": 30}
+        response = {"usage": usage, "status": "completed", "output": [
+            {"type": "message", "content": [{"type": "output_text", "text": '{"summary":"Fixture"}'}]},
+        ]}
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "dummy", "FACTORY_AUTHORIZE_PAID_AI": "1"}), patch(
+            "orchestrator.executors.exchange", side_effect=[{"input_tokens": 80}, response]
+        ) as api:
+            record = Mock()
+            self.assertEqual(execute(project, {}, "architect", {}, Mock(), 0, record_usage=record),
+                             {"summary": "Fixture"})
+            record.assert_called_once_with(usage, 140)
+            self.assertEqual(api.call_args_list[0].args[0], "/input_tokens")
+            self.assertIs(api.call_args_list[1].args[2]["store"], False)
 
     def test_checks_keep_pending_and_failed_distinct(self):
         project = SimpleNamespace(slug="sample/repo", github={"required_checks": ["one", "two"]})

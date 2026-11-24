@@ -1,6 +1,7 @@
 """Durable scheduler for a single Linux dispatcher and concurrent CLI clients."""
 
 from contextlib import contextmanager
+import hashlib
 import json
 import sqlite3
 import time
@@ -26,12 +27,26 @@ CREATE TABLE IF NOT EXISTS events (
     seq INTEGER PRIMARY KEY, job TEXT REFERENCES jobs(id), time REAL NOT NULL,
     event TEXT NOT NULL, detail TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS jobs_project_created ON jobs(project, created, id);
+CREATE INDEX IF NOT EXISTS events_job_seq ON events(job, seq);
 CREATE TABLE IF NOT EXISTS control (
     id INTEGER PRIMARY KEY CHECK (id = 1), paused INTEGER NOT NULL DEFAULT 0
 );
 INSERT OR IGNORE INTO control(id) VALUES (1);
 CREATE TABLE IF NOT EXISTS budgets (
     project TEXT PRIMARY KEY, reserved INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS budget_caps (
+    project TEXT PRIMARY KEY, microdollars INTEGER NOT NULL CHECK(microdollars >= 0)
+);
+CREATE TABLE IF NOT EXISTS holds (
+    job TEXT PRIMARY KEY REFERENCES jobs(id)
+);
+CREATE TABLE IF NOT EXISTS project_pauses (
+    project TEXT PRIMARY KEY
+);
+CREATE TABLE IF NOT EXISTS runtime (
+    id INTEGER PRIMARY KEY CHECK (id = 1), heartbeat REAL NOT NULL
 );
 """
 CRITICAL = {"start", "deploy", "backup", "rollback", "restore"}
@@ -45,6 +60,12 @@ def encode(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+def approval_version(row):
+    return hashlib.sha256(encode([
+        row["project"], row["id"], row["fingerprint"], row["spec"], row["phase"], row["attempt"],
+    ]).encode()).hexdigest()
+
+
 class Queue:
     def __init__(self, path):
         self.db = sqlite3.connect(path, timeout=15)
@@ -54,6 +75,9 @@ class Queue:
 
     @contextmanager
     def transaction(self):
+        if self.db.in_transaction:
+            yield
+            return
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
             yield
@@ -111,7 +135,7 @@ class Queue:
     def paused(self):
         return bool(self.db.execute("SELECT paused FROM control").fetchone()[0])
 
-    def approve(self, job, expected):
+    def approve(self, job, expected, *, version=None):
         with self.transaction():
             row = self.job(job)
             if row["status"] != "queued":
@@ -124,8 +148,62 @@ class Queue:
                 raise QueueError("Provide the exact reviewed head when approving a merge")
             if approval != expected:
                 raise QueueError("Approval does not match the operation")
+            if version is not None and (row["approved"] or approval_version(row) != version):
+                raise QueueError("Approval was already used or the task version changed")
             self.db.execute("UPDATE jobs SET approved=?,ready=0 WHERE id=?", (approval, job))
-            self.event(job, "approved", scope=approval)
+            self.event(job, "approved", scope=approval, version=approval_version(row))
+
+    def dependencies(self, job):
+        return [row[0] for row in self.db.execute(
+            "SELECT prerequisite FROM dependencies WHERE job=? ORDER BY prerequisite", (job,)
+        )]
+
+    def retry_job(self, project, job):
+        with self.transaction():
+            row = self.job(job)
+            if row["project"] != project.id or row["fingerprint"] != project.fingerprint:
+                raise QueueError("Project registration changed; submit a new task")
+            if row["status"] not in TERMINAL:
+                raise QueueError("Task must end before it can be retried")
+            if row["spec"]["critical"] and (row["attempt"] or row["status"] != "cancelled"):
+                raise QueueError("Inspect Factory recovery before submitting a new operation")
+            dependencies = self.dependencies(job)
+            if any(self.job(parent)["status"] != "done" for parent in dependencies):
+                raise QueueError("Finish prerequisites before retrying or submit with new dependencies")
+            new_job, = self.add(project, [row["spec"]], row["priority"], dependencies)
+            self.event(new_job, "retried_from", task=job)
+            return new_job
+
+    def set_hold(self, job, hold):
+        with self.transaction():
+            row = self.job(job)
+            if row["status"] in TERMINAL or row["cancel"]:
+                raise QueueError("Task has ended or is being cancelled")
+            if hold:
+                self.db.execute("INSERT OR IGNORE INTO holds VALUES (?)", (job,))
+            else:
+                self.db.execute("DELETE FROM holds WHERE job=?", (job,))
+            self.event(job, "held" if hold else "released")
+
+    def is_held(self, job):
+        return self.db.execute("SELECT 1 FROM holds WHERE job=?", (job,)).fetchone() is not None
+
+    def set_project_pause(self, project, paused):
+        with self.transaction():
+            if paused:
+                self.db.execute("INSERT OR IGNORE INTO project_pauses VALUES (?)", (project,))
+            else:
+                self.db.execute("DELETE FROM project_pauses WHERE project=?", (project,))
+
+    def project_paused(self, project):
+        return self.db.execute("SELECT 1 FROM project_pauses WHERE project=?", (project,)).fetchone() is not None
+
+    def heartbeat(self, active=True):
+        with self.transaction():
+            if active:
+                self.db.execute("INSERT OR REPLACE INTO runtime VALUES (1,?)", (time.time(),))
+            else:
+                self.db.execute("DELETE FROM runtime WHERE id=1")
 
     def cancel(self, job):
         with self.transaction():
@@ -154,6 +232,8 @@ class Queue:
                     self.event(job, "blocked", reason="dependency did not complete")
             row = self.db.execute(
                 """SELECT j.id FROM jobs j WHERE j.status='queued' AND j.ready<=?
+                AND NOT EXISTS (SELECT 1 FROM holds h WHERE h.job=j.id)
+                AND NOT EXISTS (SELECT 1 FROM project_pauses p WHERE p.project=j.project)
                 AND (json_extract(j.spec,'$.critical')=0 OR j.approved IS NOT NULL)
                 AND NOT EXISTS (SELECT 1 FROM dependencies d JOIN jobs p ON p.id=d.prerequisite
                     WHERE d.job=j.id AND p.status!='done')
@@ -213,8 +293,22 @@ class Queue:
         with self.transaction():
             used = self.db.execute("SELECT reserved FROM budgets WHERE project=?", (project.id,)).fetchone()
             total = (used[0] if used else 0) + amount
-            if total > project.budget["total_microdollars"]:
+            if total > self.budget_limit(project):
                 raise QueueError("Project AI budget exhausted")
             self.db.execute("INSERT OR REPLACE INTO budgets VALUES (?,?)", (project.id, total))
             if job is not None:
                 self.event(job, "budget_reserved", microdollars=amount, project_reserved=total)
+
+    def budget_limit(self, project):
+        cap = self.db.execute("SELECT microdollars FROM budget_caps WHERE project=?", (project.id,)).fetchone()
+        limit = project.budget.get("total_microdollars", 0)
+        return min(limit, cap[0]) if cap else limit
+
+    def set_budget_cap(self, project, amount):
+        with self.transaction():
+            self.db.execute("INSERT OR REPLACE INTO budget_caps VALUES (?,?)", (project, amount))
+
+    def record_usage(self, job, usage, estimated):
+        with self.transaction():
+            self.event(job, "ai_usage", input_tokens=usage["input_tokens"],
+                       output_tokens=usage["output_tokens"], estimated_microdollars=estimated)

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#122641">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+  <title>Панель WordPress Factory</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><img src="/icon-192.png" alt="" width="36" height="36"><span>WordPress Factory<small>Центр управления</small></span></a>
+    <div id="identity" hidden><span id="username"></span><button id="logout" type="button">Выйти</button></div>
+  </header>
+  <main>
+    <p id="feedback" role="status" aria-live="polite" hidden></p>
+    <section id="login-screen" class="login panel" hidden>
+      <h1>Вход в панель</h1>
+      <form id="login">
+        <label>Логин <input name="username" required autocomplete="username" autocapitalize="none" maxlength="40"></label>
+        <label>Пароль <input name="password" type="password" required autocomplete="current-password" maxlength="256"></label>
+        <button class="primary">Войти</button>
+      </form>
+    </section>
+    <div id="workspace" hidden>
+      <div class="workspace-bar">
+        <label><span id="project-label">Проект</span><select id="projects" aria-labelledby="project-label"></select></label>
+        <form id="register" hidden>
+          <label><span id="profile-label">Профиль из реестра</span><select name="project" aria-labelledby="profile-label" required></select></label>
+          <button>Подключить</button>
+        </form>
+      </div>
+      <p id="no-project" class="panel" hidden>Нет подключённых проектов.</p>
+      <div id="project-view" hidden>
+        <div class="titlebar"><div><p class="eyebrow">Тестовое окружение</p><h1 id="project-title"></h1></div><span id="executor" class="badge"></span></div>
+        <div class="metrics">
+          <section class="panel metric"><h2>Диспетчер</h2><p id="dispatcher"></p></section>
+          <section class="panel metric"><h2>Очередь проекта</h2><p id="queue-state"></p><button type="button" id="toggle-pause"></button></section>
+          <section class="panel metric">
+            <h2>Расходы AI</h2><p id="cost"></p>
+            <details>
+              <summary>Бюджет и лимиты</summary><dl id="budget"></dl>
+              <form id="budget-form" hidden>
+                <label>Лимит расходов, USD <input name="limit" type="number" min="0" step="0.000001" required></label>
+                <button>Сохранить лимит</button>
+              </form>
+            </details>
+          </section>
+        </div>
+        <nav aria-label="Разделы проекта">
+          <a href="#queue">Задачи</a><a href="#staging">Стенд и копии</a><a href="#activity">Уведомления</a>
+        </nav>
+        <div class="columns">
+          <div class="column">
+            <section class="panel" id="new-task">
+              <h2>Новая бизнес-задача</h2>
+              <form id="business">
+                <label>Что нужно сделать? <textarea name="objective" required maxlength="8000" rows="3" placeholder="Например, уточнить подписи в каталоге"></textarea></label>
+                <div class="form-row"><label><span id="role-label">Роль</span><select name="role" aria-labelledby="role-label" required></select></label><label>Приоритет <input name="priority" type="number" min="-100" max="100" value="0" required></label></div>
+                <label><span id="dependency-label">После задачи</span><select name="after" aria-labelledby="dependency-label"></select></label>
+                <button class="primary">Добавить в очередь</button>
+              </form>
+            </section>
+            <section class="panel" id="queue">
+              <div class="section-header"><h2>Задачи</h2><span id="task-count" class="muted"></span></div>
+              <div id="tasks" class="tasks"></div>
+              <button type="button" id="older-tasks" hidden>Показать ещё</button>
+              <section id="task-detail" tabindex="-1" aria-label="Выбранная задача" hidden></section>
+            </section>
+          </div>
+          <div class="column">
+            <section class="panel" id="staging">
+              <h2>Стенд и резервные копии</h2>
+              <dl id="site-status"></dl>
+              <form id="operations" hidden>
+                <label><span id="operation-label">Операция</span><select name="operation" aria-labelledby="operation-label" required></select></label>
+                <label id="ref-field" hidden>Полный Git SHA <input name="ref" pattern="[a-f0-9]{40}" maxlength="40" autocapitalize="none"></label>
+                <label id="backup-field" hidden><span id="backup-label">Снимок</span><select name="backup" aria-labelledby="backup-label"></select></label>
+                <button>Поставить операцию в очередь</button>
+              </form>
+              <h3>Снимки Factory</h3><ul id="backups" class="records"></ul>
+            </section>
+            <section class="panel" id="activity">
+              <h2>Уведомления</h2>
+              <ul id="notifications" class="records"></ul>
+              <details id="audit-panel" hidden><summary>Журнал аудита</summary><button id="load-audit">Обновить журнал</button><ul id="audit" class="records"></ul></details>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
