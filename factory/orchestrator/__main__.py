@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import signal
+from threading import Event
 
 from .projects import integer, load
 from .queue import Queue, QueueError
@@ -74,7 +76,12 @@ def main(args):
                     fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except BlockingIOError:
                     raise QueueError("Another dispatcher owns this state") from None
-                Worker(db, state, projects, lease.fileno()).run(queue, workers, args.once)
+                stop = Event()
+                previous = signal.signal(signal.SIGTERM, lambda *_: stop.set())
+                try:
+                    Worker(db, state, projects, lease.fileno()).run(queue, workers, args.once, stop)
+                finally:
+                    signal.signal(signal.SIGTERM, previous)
             return None
         if command in ("business", "submit", "seed"):
             if args.project not in projects:

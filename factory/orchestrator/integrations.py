@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import time
 
 from .executors import Critical, Retryable
@@ -19,10 +20,18 @@ MAX_CONTEXT = 192 * 1024
 ASSIGNEE = re.compile(r"[a-f0-9]{32}")
 BASE_ENV = ("PATH", "HOME", "LANG", "SSL_CERT_FILE", "SSL_CERT_DIR",
             "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy")
+DOCKER_ENV = ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG")
 GIT_AUTHOR = {
     "GIT_AUTHOR_NAME": "Factory Orchestrator", "GIT_AUTHOR_EMAIL": "factory@example.invalid",
     "GIT_COMMITTER_NAME": "Factory Orchestrator", "GIT_COMMITTER_EMAIL": "factory@example.invalid",
 }
+
+
+def timeout_command():
+    command = shutil.which("gtimeout") or shutil.which("timeout")
+    if not command:
+        raise Critical("GNU timeout is required (install coreutils)")
+    return command
 
 
 class Integrations:
@@ -42,8 +51,8 @@ class Integrations:
         env.update(environment or {})
         try:
             process = subprocess.run(
-                ["timeout", "--signal=TERM", "--kill-after=3", str(self.project.timeout), *map(str, args)],
-                cwd=cwd, env=env, pass_fds=(self.lease,), stdin=subprocess.DEVNULL,
+                [timeout_command(), "--signal=TERM", "--kill-after=3", str(self.project.timeout), *map(str, args)],
+                cwd=cwd, env=env, pass_fds=() if self.lease is None else (self.lease,), stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
             )
         except OSError:
@@ -142,9 +151,16 @@ class Integrations:
             raise QueueError("Diff exceeds the review size limit")
         return patch
 
-    def gh(self, *args, fail=Retryable, label="GitHub command"):
-        return self.command(["gh", *args], cwd=self.checkout, environment=self.github_env(),
-                            fail=fail, label=label).stdout
+    def gh(self, *args, fail=Retryable, label="GitHub command", cwd=None):
+        process = self.command(["gh", *args], cwd=cwd or self.checkout, environment=self.github_env(),
+                               label=label)
+        if process.returncode:
+            if "HTTP 401" in process.stderr or "HTTP 403" in process.stderr:
+                raise Critical(f"{label}: GitHub rejected the credential or permissions")
+            if "HTTP 404" in process.stderr:
+                raise Critical(f"{label}: GitHub resource missing or inaccessible")
+            raise fail(f"{label} failed (exit {process.returncode})")
+        return process.stdout
 
     def pr(self):
         output = self.gh("pr", "list", "--repo", self.project.slug, "--head", self.branch,
@@ -239,7 +255,8 @@ class Integrations:
     def factory(self):
         spec = self.job["spec"]
         operation = spec["operation"]
-        args = ["python3", "-B", FACTORY, "--site", self.project.profile,
+        environment = {name: os.environ[name] for name in DOCKER_ENV if name in os.environ}
+        args = [sys.executable, "-B", FACTORY, "--site", self.project.profile,
                 "--state", self.state / "wordpress", "--repository", self.project.factory_source]
         self.directory.mkdir(exist_ok=True)
         if spec["ref"]:
@@ -254,7 +271,7 @@ class Integrations:
             tail = [release]
         else:
             tail = [spec["backup"]] if spec["backup"] else []
-        process = self.command([*args, operation, *tail], label=f"Factory {operation}")
+        process = self.command([*args, operation, *tail], environment=environment, label=f"Factory {operation}")
         if process.returncode:
             failure = process.stdout + process.stderr
             if "Operation failed and the site was recovered" in failure:

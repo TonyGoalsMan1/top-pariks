@@ -113,6 +113,20 @@
       "retry_policy": "read_only",
       "verify": "python3 -B factory/tests/control_lifecycle.py --wordpress --browser and STAGE-015 PR checks",
       "evidence": [45334470942, 45334470930]
+    },
+    {
+      "id": "integration-live-pilot",
+      "depends_on": [
+        "control-center"
+      ],
+      "status": "blocked",
+      "blocked_by": "Live acceptance requires owner access to a local host, an isolated GitHub repository and an authorized AI credential.",
+      "criteria": [
+        "Launch preflight, PWA, API and dispatcher with the same SQLite state.",
+        "Run protected CI and complete an authorized pilot with a real executor and physical iPhone."
+      ],
+      "retry_policy": "state_change",
+      "verify": "docs/STAGE-016.md"
     }
   ]
 }

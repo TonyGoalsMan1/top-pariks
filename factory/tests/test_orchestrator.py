@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from orchestrator.executors import Critical, execute
+from orchestrator.executors import Critical, Retryable, execute, model_access
 from orchestrator.integrations import Integrations
 from orchestrator.queue import Queue, QueueError
 
@@ -91,6 +91,19 @@ class RemoteContracts(unittest.TestCase):
                 execute(project, {}, "wordpress", {}, reserve, 0)
             reserve.assert_called_once_with(200)
             self.assertEqual(api.call_count, 1)
+
+    def test_model_preflight_distinguishes_transport_and_auth_failures(self):
+        with patch("orchestrator.executors.subprocess.run") as curl:
+            curl.return_value = SimpleNamespace(returncode=6, stdout=b"")
+            with self.assertRaisesRegex(Retryable, "transport failed"):
+                model_access("dummy", "sample-model", 5)
+            curl.return_value = SimpleNamespace(returncode=0, stdout=b"private detail\n401")
+            with self.assertRaisesRegex(Critical, r"permissions \(HTTP 401\)$"):
+                model_access("dummy", "sample-model", 5)
+            curl.return_value = SimpleNamespace(returncode=0, stdout=b'{"id":"sample-model"}\n200')
+            model_access("dummy", "sample-model", 5)
+            self.assertNotIn("dummy", curl.call_args.args[0])
+            self.assertNotIn("--data-binary", curl.call_args.args[0])
 
     def test_responses_records_confirmed_token_usage(self):
         project = SimpleNamespace(executor="responses", timeout=5, budget={

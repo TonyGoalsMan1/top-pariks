@@ -6,6 +6,7 @@ import contextlib
 import datetime as dt
 import fcntl
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -415,6 +416,8 @@ def arguments():
     parser.add_argument("--repository", type=Path, default=REPO, help="Trusted Git checkout for theme and seed")
     parser.add_argument("--state", type=Path, default=state_home / "wordpress-factory")
     commands = parser.add_subparsers(dest="command", required=True)
+    check = commands.add_parser("check", help="Validate a local pilot profile and Compose configuration")
+    check.add_argument("--branch", required=True)
     build = commands.add_parser("build")
     build.add_argument("output", type=Path)
     build.add_argument("--ref", default="HEAD")
@@ -435,6 +438,20 @@ def main():
     if state.is_relative_to(REPO) or state.is_relative_to(repository):
         raise FactoryError("Runtime state and backups must be outside the Git checkout")
     site = Site(args.site, state, repo=repository)
+    if args.command == "check":
+        if site.root.exists():
+            # Reuse the profile binding and check the journal while holding the site lock.
+            with site.lock():
+                if site.pending.exists():
+                    raise FactoryError("Unfinished operation. Run rollback before continuing.")
+        branch = f"refs/heads/{args.branch}"
+        subprocess.run(["git", "-C", repository, "show-ref", "--verify", "--quiet", branch], check=True)
+        site.compose("config", "--quiet")
+        services = site.compose("ps", "--status", "running", "--services", capture=True).splitlines()
+        if services and not {"wordpress", "db"} <= set(services):
+            raise FactoryError("WordPress and its database must both be running or stopped")
+        print(json.dumps({"running": bool(services), "url": site.url}))
+        return
     if args.command == "build":
         build_release(site, args.ref, args.output.resolve())
         return

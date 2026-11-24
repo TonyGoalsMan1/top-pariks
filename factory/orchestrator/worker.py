@@ -168,14 +168,14 @@ class Worker:
             }, 0
         return status, phase, result, delay, critical
 
-    def run(self, queue, workers, once):
+    def run(self, queue, workers, once, stop):
         queue.heartbeat()
         try:
-            self.dispatch(queue, workers, once)
+            self.dispatch(queue, workers, once, stop)
         finally:
             queue.heartbeat(False)
 
-    def dispatch(self, queue, workers, once):
+    def dispatch(self, queue, workers, once, stop):
         queue.recover()
         heartbeat_at = time.monotonic() + 2
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -184,13 +184,13 @@ class Worker:
                 if time.monotonic() >= heartbeat_at:
                     queue.heartbeat()
                     heartbeat_at = time.monotonic() + 2
-                while len(active) < workers:
+                while not stop.is_set() and len(active) < workers:
                     job = queue.claim()
                     if not job:
                         break
                     active[pool.submit(self.perform, job)] = job["id"]
                 if not active:
-                    if once:
+                    if once or stop.is_set():
                         return
                     time.sleep(0.5)
                     continue

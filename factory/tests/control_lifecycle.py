@@ -208,7 +208,7 @@ def main():
         origin = f"http://127.0.0.1:{port}"
         # Deliberately provide a dummy secret and strip paid authorization from the worker.
         environment = dict(os.environ, OPENAI_API_KEY=SECRET, FACTORY_AUTHORIZE_PAID_AI="0")
-        command = [sys.executable, "-B", "-m", "factory.control", "--config", scenario.config,
+        command = [sys.executable, "-B", "-m", "factory.pilot", "--config", scenario.config,
                    "--state", scenario.state, "--accounts", accounts, "--origin", origin, "--port", str(port)]
         def ready():
             try:
@@ -218,7 +218,7 @@ def main():
                 return False
 
         try:
-            with background(command, environment), background([*scenario.cli, "run"], environment):
+            with background(command, environment):
                 until(ready)
                 api_checks(scenario, origin, args.wordpress)
                 print("Control Center HTTP/queue integration passed. AI executor: mock.", flush=True)
