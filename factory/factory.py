@@ -40,10 +40,14 @@ class SiteBusy(FactoryError):
 class Site:
     repo = REPO
 
-    def __init__(self, config_path, state):
+    def __init__(self, config_path, state, *, repo=None):
+        if repo is not None:
+            self.repo = repo
         self.config = read_json(config_path)
         self.id = self.config["site_id"]
         self.slug = self.config["theme"]["slug"]
+        self.woocommerce = "woocommerce" in self.config
+        self.packages = ("wp_cli", "woocommerce") if self.woocommerce else ("wp_cli",)
         self.port = self.config["port"]
         self.validate()
         self.url = f"http://127.0.0.1:{self.port}"
@@ -64,7 +68,7 @@ class Site:
             "site_id", "port", "wordpress_image", "database_image"
         )}
         self.backup_profile["theme"] = self.slug
-        for key in ("wp_cli", "woocommerce"):
+        for key in self.packages:
             self.backup_profile[f"{key}_sha256"] = self.config[key]["sha256"]
 
     def validate(self):
@@ -82,21 +86,23 @@ class Site:
         for key in ("wordpress_image", "database_image"):
             if not re.fullmatch(rf"[a-z0-9][a-zA-Z0-9/.:_-]+@sha256:{SHA256}", self.config[key]):
                 raise FactoryError(f"{key} requires a pinned image digest")
-        for key in ("wp_cli", "woocommerce"):
+        for key in self.packages:
             package = self.config[key]
             if not package["url"].startswith("https://") or not re.fullmatch(SHA256, package["sha256"]):
                 raise FactoryError(f"{key} requires an HTTPS URL and SHA-256")
         smoke = self.config["smoke"]
-        for key in ("catalog_path", "product_path", "cart_path"):
-            if not re.fullmatch(r"/[a-zA-Z0-9_/-]+", smoke[key]) or "//" in smoke[key]:
-                raise FactoryError(f"Invalid storefront path: {key}")
-        for key in ("home_text", "product_name", "cart_price"):
+        markers = ("home_text", "product_name", "cart_price") if self.woocommerce else ("home_text",)
+        for key in markers:
             if not smoke[key].strip():
                 raise FactoryError(f"Empty storefront marker: {key}")
+        if self.woocommerce:
+            for key in ("catalog_path", "product_path", "cart_path"):
+                if not re.fullmatch(r"/[a-zA-Z0-9_/-]+", smoke[key]) or "//" in smoke[key]:
+                    raise FactoryError(f"Invalid storefront path: {key}")
 
     def local_file(self, path):
-        resolved = (REPO / archive_path(path)).resolve()
-        if not resolved.is_relative_to(REPO):
+        resolved = (self.repo / archive_path(path)).resolve()
+        if not resolved.is_relative_to(self.repo):
             raise FactoryError("File must stay inside the repository")
         return resolved
 
@@ -228,7 +234,7 @@ def provision(site, release):
         health(site)
         return
     with release_tar(site, release) as theme:
-        site.prepare_runtime(install_woocommerce=True)
+        site.prepare_runtime(install_woocommerce=site.woocommerce)
         site.start_web()
         for attempt in range(30):
             try:
@@ -249,23 +255,25 @@ def provision(site, release):
             )
 
         install_theme(site, theme)
-        with ZipFile(site.runtime / "woocommerce.zip") as woo:
-            # The pinned upstream package is installed from local bytes.
-            first = {archive_path(name).parts[0] for name in woo.namelist()}
-            if first != {"woocommerce"}:
-                raise FactoryError("Unexpected WooCommerce ZIP layout")
-        with (site.runtime / "woocommerce.zip").open("rb") as stream:
-            site.files("""cat > /tmp/woocommerce.zip
+        if site.woocommerce:
+            with ZipFile(site.runtime / "woocommerce.zip") as woo:
+                # The pinned upstream package is installed from local bytes.
+                first = {archive_path(name).parts[0] for name in woo.namelist()}
+                if first != {"woocommerce"}:
+                    raise FactoryError("Unexpected WooCommerce ZIP layout")
+            with (site.runtime / "woocommerce.zip").open("rb") as stream:
+                site.files("""cat > /tmp/woocommerce.zip
                 php -r '$zip = new ZipArchive();
                     exit($zip->open("/tmp/woocommerce.zip") === true
                         && $zip->extractTo("/var/www/html/wp-content/plugins") ? 0 : 1);'
                 chown -R www-data:www-data /var/www/html/wp-content/plugins/woocommerce""",
-                stdin=stream)
+                    stdin=stream)
         with (REPO / "sandbox/test-only.php").open("rb") as stream:
             site.files("""mkdir -p /var/www/html/wp-content/mu-plugins
                 cat > /var/www/html/wp-content/mu-plugins/factory-test-only.php
                 chmod 644 /var/www/html/wp-content/mu-plugins/factory-test-only.php""", stdin=stream)
-        site.wp("plugin", "activate", "woocommerce")
+        if site.woocommerce:
+            site.wp("plugin", "activate", "woocommerce")
         site.wp("theme", "activate", site.slug)
         site.wp("rewrite", "structure", "/%postname%/", "--hard")
         with site.local_file(site.config["seed"]).open("rb") as seed:
@@ -404,6 +412,7 @@ def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site", required=True, type=Path, help="JSON site profile")
     state_home = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+    parser.add_argument("--repository", type=Path, default=REPO, help="Trusted Git checkout for theme and seed")
     parser.add_argument("--state", type=Path, default=state_home / "wordpress-factory")
     commands = parser.add_subparsers(dest="command", required=True)
     build = commands.add_parser("build")
@@ -422,9 +431,10 @@ def main():
     os.umask(0o077)
     args = arguments()
     state = args.state.resolve()
-    if state.is_relative_to(REPO):
+    repository = args.repository.resolve(strict=True)
+    if state.is_relative_to(REPO) or state.is_relative_to(repository):
         raise FactoryError("Runtime state and backups must be outside the Git checkout")
-    site = Site(args.site, state)
+    site = Site(args.site, state, repo=repository)
     if args.command == "build":
         build_release(site, args.ref, args.output.resolve())
         return

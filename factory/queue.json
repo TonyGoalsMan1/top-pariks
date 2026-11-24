@@ -84,6 +84,20 @@
       ],
       "retry_policy": "state_change",
       "verify": "docs/STAGE-013.md"
+    },
+    {
+      "id": "autonomous-orchestrator",
+      "depends_on": [
+        "server-infrastructure"
+      ],
+      "status": "done",
+      "criteria": [
+        "Drain a persistent, permissioned queue on two isolated Git and WordPress projects.",
+        "Verify bounded retry, restart recovery, independent review, Factory health and rejected operations.",
+        "Keep paid AI and GitHub auto-merge disabled by default."
+      ],
+      "retry_policy": "read_only",
+      "verify": "python3 -B factory/tests/orchestrator_lifecycle.py --wordpress and the STAGE-014 PR checks"
     }
   ]
 }

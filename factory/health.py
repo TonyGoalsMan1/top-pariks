@@ -37,6 +37,9 @@ def storefront(site):
 
     smoke = site.config["smoke"]
     fetch("/", smoke["home_text"])
+    if not site.woocommerce:
+        print("WordPress healthy: homepage")
+        return
     fetch(smoke["catalog_path"], smoke["product_name"])
     product = fetch(smoke["product_path"], smoke["product_name"])
     button = re.search(r'name=["\']add-to-cart["\']\s+value=["\']([1-9][0-9]*)["\']', product)
@@ -62,7 +65,8 @@ def health(site):
             time.sleep(1)
 
     site.wp("core", "is-installed", "--skip-plugins", "--skip-themes")
-    site.wp("plugin", "is-active", "woocommerce", "--skip-themes")
+    if site.woocommerce:
+        site.wp("plugin", "is-active", "woocommerce", "--skip-themes")
     if site.wp("option", "get", "stylesheet", "--skip-themes", capture=True) != site.slug:
         raise FactoryError("Unexpected active theme")
     for option in ("siteurl", "home"):
