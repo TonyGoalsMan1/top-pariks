@@ -96,6 +96,8 @@ class Project:
             self.profile = (directory / config["wordpress_profile"]).resolve(strict=True)
             self.factory_source = (directory / config["factory_source"]).resolve(strict=True)
             profile = json.loads(self.profile.read_text())
+            if ("woocommerce" in profile) != (self.site_type == "woocommerce"):
+                raise QueueError("Project site type must match the Factory profile")
             self.site_id = profile["site_id"]
             self.port = integer(profile["port"], 1024, 65535)
             if not re.fullmatch(IDENTIFIER, self.site_id):

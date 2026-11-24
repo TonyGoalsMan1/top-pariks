@@ -32,6 +32,7 @@ class Scenario:
 
     def register(self):
         for project, port in zip(("alpha", "beta"), allocate_ports()):
+            site_type = "woocommerce" if project == "alpha" else "wordpress"
             repo = self.temp / project
             repo.mkdir()
             run("git", "init", "-q", "-b", "main", cwd=repo)
@@ -42,17 +43,27 @@ class Scenario:
                 profile = json.loads((REPO / "factory/sites/example-store.json").read_text())
                 profile.update(site_id=f"{project}-{uuid.uuid4().hex[:8]}", port=port,
                                title=f"Fixture {project}")
+                if site_type == "wordpress":
+                    profile.pop("woocommerce")
+                    profile.update(smoke={"home_text": "Synthetic WordPress homepage"},
+                                   theme={"slug": "factory-fixture", "source": "theme/factory-fixture"})
                 path = self.temp / f"{project}.json"
                 path.write_text(json.dumps(profile))
-                site = Site(path, self.lifecycle.state)
-                self.sites[project] = site
-                self.lifecycle.sites[site.id] = (path, site)
                 seed = repo / profile["seed"]
                 seed.parent.mkdir(parents=True)
-                shutil.copyfile(REPO / profile["seed"], seed)
                 theme = repo / profile["theme"]["source"]
                 theme.parent.mkdir(parents=True)
-                shutil.copytree(REPO / profile["theme"]["source"], theme)
+                if site_type == "woocommerce":
+                    shutil.copyfile(REPO / profile["seed"], seed)
+                    shutil.copytree(REPO / profile["theme"]["source"], theme)
+                else:
+                    seed.write_text("<?php update_option('factory_fixture', 'wordpress');\n")
+                    theme.mkdir()
+                    (theme / "style.css").write_text("/* Theme Name: Factory Fixture\nVersion: 1.0 */\n")
+                    (theme / "index.php").write_text("<?php echo 'Synthetic WordPress homepage';\n")
+                site = Site(path, self.lifecycle.state, repo=repo)
+                self.sites[project] = site
+                self.lifecycle.sites[site.id] = (path, site)
             run("git", "add", ".", cwd=repo)
             run("git", "commit", "-qm", "Initial synthetic fixture", cwd=repo)
             self.refs[project] = run("git", "rev-parse", "HEAD", cwd=repo)
@@ -62,7 +73,7 @@ class Scenario:
                 if project == "alpha":
                     operations += ["deploy"]
             self.projects.append({
-                "id": project, "repository": project, "base": "main", "site_type": "woocommerce",
+                "id": project, "repository": project, "base": "main", "site_type": site_type,
                 "domain": f"{project}.test", "environments": ["test"], "permissions": operations,
                 "agents": ["project-manager", "architect", "wordpress", "qa", "security"],
                 "executor": "mock", "budget": {}, "editable": ["fixture.js"],
@@ -174,6 +185,11 @@ class Scenario:
             require(self.sites[project].wp("option", "get", "blogname", capture=True) == f"Fixture {project}",
                     "Sites do not have isolated WordPress settings")
         self.run()
+        plain = self.sites["beta"]
+        require(plain.wp("option", "get", "factory_fixture", capture=True) == "wordpress",
+                "Standalone WordPress seed did not run")
+        require("woocommerce" not in plain.wp("plugin", "list", "--field=name", capture=True),
+                "Standalone WordPress must have no WooCommerce plugin")
         site = self.sites["alpha"]
         backup_id = self.check(jobs["alpha"][-1], "done")["result"]["backup"]
         self.check(jobs["beta"][-1], "done")
