@@ -40,7 +40,9 @@ class SiteBusy(FactoryError):
 class Site:
     repo = REPO
 
-    def __init__(self, config_path, state):
+    def __init__(self, config_path, state, *, repo=None):
+        if repo is not None:
+            self.repo = repo
         self.config = read_json(config_path)
         self.id = self.config["site_id"]
         self.slug = self.config["theme"]["slug"]
@@ -95,8 +97,8 @@ class Site:
                 raise FactoryError(f"Empty storefront marker: {key}")
 
     def local_file(self, path):
-        resolved = (REPO / archive_path(path)).resolve()
-        if not resolved.is_relative_to(REPO):
+        resolved = (self.repo / archive_path(path)).resolve()
+        if not resolved.is_relative_to(self.repo):
             raise FactoryError("File must stay inside the repository")
         return resolved
 
@@ -404,6 +406,7 @@ def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site", required=True, type=Path, help="JSON site profile")
     state_home = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+    parser.add_argument("--repository", type=Path, default=REPO, help="Trusted Git checkout for theme and seed")
     parser.add_argument("--state", type=Path, default=state_home / "wordpress-factory")
     commands = parser.add_subparsers(dest="command", required=True)
     build = commands.add_parser("build")
@@ -422,9 +425,10 @@ def main():
     os.umask(0o077)
     args = arguments()
     state = args.state.resolve()
-    if state.is_relative_to(REPO):
+    repository = args.repository.resolve(strict=True)
+    if state.is_relative_to(REPO) or state.is_relative_to(repository):
         raise FactoryError("Runtime state and backups must be outside the Git checkout")
-    site = Site(args.site, state)
+    site = Site(args.site, state, repo=repository)
     if args.command == "build":
         build_release(site, args.ref, args.output.resolve())
         return

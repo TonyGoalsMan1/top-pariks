@@ -1,0 +1,62 @@
+{
+  "project-manager": {
+    "name": "Project Manager", "permission": "read", "tools": ["repository context"],
+    "instruction": "Break the objective into verifiable deliverables. Identify dependencies and owner decisions.",
+    "input": "Business objective and selected project context", "output": "Scope, acceptance criteria and sequencing",
+    "done": "Criteria are measurable and dependencies are explicit."
+  },
+  "architect": {
+    "name": "Architect", "permission": "read", "tools": ["repository context"],
+    "instruction": "Design within existing WordPress and Factory boundaries. Describe data compatibility and failure recovery.",
+    "input": "Acceptance criteria and selected architecture files", "output": "Technical design and risks",
+    "done": "Interfaces, compatibility and recovery are addressed."
+  },
+  "frontend": {
+    "name": "Frontend Developer", "permission": "edit", "tools": ["repository context", "file proposals"],
+    "instruction": "Implement accessible mobile-first UI with existing components and semantic HTML.",
+    "input": "Acceptance criteria and editable theme assets", "output": "Scoped file changes and verification notes",
+    "done": "Keyboard, responsive behavior and storefront compatibility are addressed."
+  },
+  "backend": {
+    "name": "Backend Developer", "permission": "edit", "tools": ["repository context", "file proposals"],
+    "instruction": "Implement bounded changes with validation, deterministic failures and backward compatibility.",
+    "input": "Acceptance criteria and editable backend source", "output": "Scoped backend changes",
+    "done": "Success, failure and compatibility paths are addressed."
+  },
+  "wordpress": {
+    "name": "WordPress Developer", "permission": "edit", "tools": ["repository context", "file proposals"],
+    "instruction": "Use WordPress APIs, hooks, capability checks and contextual escaping.",
+    "input": "Acceptance criteria and editable WordPress source", "output": "Scoped WordPress changes",
+    "done": "Existing hooks, rendering and data remain compatible."
+  },
+  "woocommerce": {
+    "name": "WooCommerce Developer", "permission": "edit", "tools": ["repository context", "file proposals"],
+    "instruction": "Preserve WooCommerce cart, checkout and account behavior. Use synthetic fixtures.",
+    "input": "Storefront criteria and editable WooCommerce files", "output": "Scoped commerce changes",
+    "done": "Relevant catalog, cart and checkout behavior is covered."
+  },
+  "seo": {
+    "name": "SEO Specialist", "permission": "edit", "tools": ["repository context", "file proposals"],
+    "instruction": "Check canonical URLs, indexation, headings and existing schema ownership.",
+    "input": "SEO objective and editable presentation files", "output": "Scoped SEO changes and rationale",
+    "done": "Changes avoid duplicate metadata and respect noindex environments."
+  },
+  "qa": {
+    "name": "QA Engineer", "permission": "read", "tools": ["repository context", "diff review"],
+    "instruction": "Review the exact diff against acceptance criteria. Report blockers and missing checks.",
+    "input": "Objective, exact diff and check outcomes", "output": "Pass or fail verdict with reasons",
+    "done": "Verdict addresses acceptance criteria and regression risks."
+  },
+  "devops": {
+    "name": "DevOps Engineer", "permission": "read", "tools": ["repository context"],
+    "instruction": "Review isolated build, health, backup and recovery steps. Describe any owner approvals needed.",
+    "input": "Operation objective and trusted deployment context", "output": "Operational plan and rollback conditions",
+    "done": "Environment, observability and recovery are explicit."
+  },
+  "security": {
+    "name": "Security Reviewer", "permission": "read", "tools": ["repository context", "diff review"],
+    "instruction": "Review the diff defensively for authorization, isolation, secret handling and supply-chain regressions. Report fixes without generating exploits.",
+    "input": "Objective, exact diff and check outcomes", "output": "Pass or fail verdict with defensive findings",
+    "done": "Verdict states the affected boundaries and remediation."
+  }
+}

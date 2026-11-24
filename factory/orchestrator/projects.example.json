@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "id": "example-store",
+      "repository": "../..",
+      "base": "main",
+      "site_type": "woocommerce",
+      "domain": "example-store.test",
+      "environments": ["test"],
+      "permissions": ["report", "code", "build", "start", "health", "backup", "deploy", "rollback", "restore"],
+      "agents": ["project-manager", "architect", "wordpress", "qa"],
+      "review_role": "qa",
+      "wordpress_profile": "../sites/example-store.json",
+      "factory_source": "../..",
+      "executor": "mock",
+      "budget": {},
+      "context": ["README.md"],
+      "editable": ["theme/top-pariks/README.txt"],
+      "mock": {
+        "fail_first": true,
+        "files": {"theme/top-pariks/README.txt": "Synthetic fixture proposal\n"}
+      },
+      "timeout_seconds": 120,
+      "max_attempts": 3,
+      "retry_seconds": 2,
+      "queue": [
+        {"operation": "report", "role": "project-manager", "objective": "Define test storefront acceptance criteria."},
+        {"operation": "code", "role": "wordpress", "objective": "Update the isolated fixture readme."}
+      ]
+    }
+  ]
+}

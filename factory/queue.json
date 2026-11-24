@@ -1,18 +1,37 @@
 {
   "schema_version": 1,
-  "statuses": ["pending", "running", "blocked", "done"],
+  "statuses": [
+    "pending",
+    "running",
+    "blocked",
+    "done"
+  ],
   "retry_policies": {
     "read_only": {
       "max_attempts": 3,
-      "backoff_seconds": [10, 30],
-      "retry_on": ["transient_network_error", "temporary_runner_unavailable"],
-      "stop_on": ["invalid_configuration", "integrity_mismatch", "assertion_failure"]
+      "backoff_seconds": [
+        10,
+        30
+      ],
+      "retry_on": [
+        "transient_network_error",
+        "temporary_runner_unavailable"
+      ],
+      "stop_on": [
+        "invalid_configuration",
+        "integrity_mismatch",
+        "assertion_failure"
+      ]
     },
     "state_change": {
       "max_attempts": 1,
       "backoff_seconds": [],
       "retry_on": [],
-      "stop_on": ["pending_journal", "failed_health", "integrity_mismatch"],
+      "stop_on": [
+        "pending_journal",
+        "failed_health",
+        "integrity_mismatch"
+      ],
       "before_retry": "Resolve the journal, verify recovery and fix the cause before submitting a new task."
     }
   },
@@ -21,41 +40,65 @@
       "id": "profiles",
       "depends_on": [],
       "status": "done",
-      "criteria": ["Two profiles provision separate Compose projects, databases and WordPress volumes."],
+      "criteria": [
+        "Two profiles provision separate Compose projects, databases and WordPress volumes."
+      ],
       "retry_policy": "state_change",
       "verify": "python3 factory/tests/lifecycle.py"
     },
     {
       "id": "release",
-      "depends_on": ["profiles"],
+      "depends_on": [
+        "profiles"
+      ],
       "status": "done",
-      "criteria": ["Build the theme from a Git commit and verify its ZIP, manifest and SHA-256."],
+      "criteria": [
+        "Build the theme from a Git commit and verify its ZIP, manifest and SHA-256."
+      ],
       "retry_policy": "read_only",
       "verify": "python3 -m unittest discover -s factory/tests -v"
     },
     {
       "id": "recovery",
-      "depends_on": ["release"],
+      "depends_on": [
+        "release"
+      ],
       "status": "done",
-      "criteria": ["Restore the database and files on existing and empty volumes.", "Reject corrupted and foreign snapshots.", "A failed storefront check rolls back the theme and preserves subsequent DB writes."],
+      "criteria": [
+        "Restore the database and files on existing and empty volumes.",
+        "Reject corrupted and foreign snapshots.",
+        "A failed storefront check rolls back the theme and preserves subsequent DB writes."
+      ],
       "retry_policy": "state_change",
       "verify": "python3 factory/tests/lifecycle.py"
     },
     {
       "id": "github-ci",
-      "depends_on": ["recovery"],
+      "depends_on": [
+        "recovery"
+      ],
       "status": "done",
-      "criteria": ["Factory lifecycle and existing TOP-PARIKS CI pass for the PR."],
+      "criteria": [
+        "Factory lifecycle and existing TOP-PARIKS CI pass for the PR."
+      ],
       "retry_policy": "read_only",
       "verify": ".github/workflows/factory.yml and .github/workflows/ci.yml",
-      "evidence": [45258606169, 45258603762]
+      "evidence": [
+        45258606169,
+        45258603762
+      ]
     },
     {
       "id": "staging-pilot",
-      "depends_on": ["github-ci"],
+      "depends_on": [
+        "github-ci"
+      ],
       "status": "blocked",
       "blocked_by": "Owner has not commissioned a separate authorized Linux staging host.",
-      "criteria": ["Run the disposable lifecycle on the new host.", "Verify private off-host copies and recovery before introducing real data."],
+      "criteria": [
+        "Run the disposable lifecycle on the new host.",
+        "Verify private off-host copies and recovery before introducing real data."
+      ],
       "retry_policy": "state_change",
       "verify": "docs/STAGE-012.md"
     },
@@ -84,6 +127,20 @@
       ],
       "retry_policy": "state_change",
       "verify": "docs/STAGE-013.md"
+    },
+    {
+      "id": "autonomous-orchestrator",
+      "depends_on": [
+        "server-infrastructure"
+      ],
+      "status": "pending",
+      "criteria": [
+        "Drain a persistent, permissioned queue on two isolated Git and WordPress projects.",
+        "Verify bounded retry, restart recovery, independent review, Factory health and rejected operations.",
+        "Keep paid AI and GitHub auto-merge disabled by default."
+      ],
+      "retry_policy": "read_only",
+      "verify": "python3 -B factory/tests/orchestrator_lifecycle.py --wordpress and the STAGE-014 PR checks"
     }
   ]
 }
