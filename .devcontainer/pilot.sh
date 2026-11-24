@@ -14,8 +14,12 @@ export CODEX_HOME="$FACTORY_PILOT_HOME/codex"
 repository="$GITHUB_USER/top-pariks-factory-pilot"
 origin="https://$CODESPACE_NAME-8787.$GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"
 pilot=(bash scripts/factory-pilot-017.sh)
-if [[ ! -e "$FACTORY_PILOT_HOME" && ! -L "$FACTORY_PILOT_HOME" && ! -w /workspaces ]]; then
-  sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" "$FACTORY_PILOT_HOME"
+if python3 -IB .devcontainer/pilot-state.py; then
+  :
+else
+  status=$?
+  [[ "$status" == 3 ]] || exit "$status"
+  sudo -n /usr/bin/python3 -IB - --sudo < .devcontainer/pilot-state.py
 fi
 python3 -B -c 'import sys; from pathlib import Path; from factory.orchestrator.__main__ import private_state; private_state(Path(sys.argv[1]))' "$FACTORY_PILOT_HOME"
 log="$FACTORY_PILOT_HOME/start.log"
@@ -28,8 +32,12 @@ panel_ready() {
 case "${1:-}" in
   start)
     # Leave the IDE responsive while pinned WooCommerce packages and images are fetched.
-    nohup flock -n -F "$FACTORY_PILOT_HOME/panel.lock" bash "$0" serve </dev/null >>"$log" 2>&1 &
-    printf 'Factory: bash .devcontainer/pilot.sh access\n'
+    # Hold the lock before returning so access can safely follow start immediately.
+    exec 9<>"$FACTORY_PILOT_HOME/panel.lock"
+    if flock -n 9; then
+      nohup bash "$0" serve </dev/null >>"$log" 2>&1 &
+    fi
+    printf 'Factory: Terminal → Run Task → Factory: Open pilot panel\n'
     ;;
   serve)
     for attempt in {1..30}; do
