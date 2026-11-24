@@ -209,10 +209,12 @@ class Queue:
                     self.db.execute("UPDATE control SET paused=1 WHERE id=1")
                     self.event(row["id"], "automatic_pause")
 
-    def reserve(self, project, amount):
+    def reserve(self, project, amount, job=None):
         with self.transaction():
             used = self.db.execute("SELECT reserved FROM budgets WHERE project=?", (project.id,)).fetchone()
             total = (used[0] if used else 0) + amount
             if total > project.budget["total_microdollars"]:
                 raise QueueError("Project AI budget exhausted")
             self.db.execute("INSERT OR REPLACE INTO budgets VALUES (?,?)", (project.id, total))
+            if job is not None:
+                self.event(job, "budget_reserved", microdollars=amount, project_reserved=total)

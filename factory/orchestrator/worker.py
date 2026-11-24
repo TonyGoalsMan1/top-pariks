@@ -32,7 +32,7 @@ class Worker:
         def reserve(amount):
             queue = Queue(self.db_path)
             try:
-                queue.reserve(project, amount)
+                queue.reserve(project, amount, job["id"])
             finally:
                 queue.db.close()
 

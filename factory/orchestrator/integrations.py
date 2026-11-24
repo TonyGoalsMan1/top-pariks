@@ -9,6 +9,7 @@ import subprocess
 import time
 
 from .executors import Critical, Retryable
+from .projects import BACKUP_ID
 from .queue import QueueError
 
 
@@ -117,6 +118,16 @@ class Integrations:
             raise QueueError("Executor proposed no file changes")
         if self.git("diff", "--check", "--no-ext-diff", "--no-textconv", base, fail=None).returncode:
             raise Retryable("Whitespace check failed (git diff --check)")
+        syntax = {".php": ("php", "-n", "-l"), ".js": ("node", "--check")}
+        for name in sorted(updated):
+            path = self.checkout / name
+            if path.suffix in syntax:
+                check = self.command([*syntax[path.suffix], path], cwd=self.checkout,
+                                     label="Source syntax check")
+                if check.returncode in {126, 127}:
+                    raise Critical(f"Missing syntax checker for {path.suffix} files")
+                if check.returncode:
+                    raise Retryable(f"Syntax check failed for {name}")
         self.git("add", "--", *sorted(updated))
         if self.git("diff", "--cached", "--quiet", "--", fail=None).returncode == 0:
             raise QueueError("Proposal did not change the working tree")
@@ -239,9 +250,17 @@ class Integrations:
             tail = [release]
         else:
             tail = [spec["backup"]] if spec["backup"] else []
-        protected = Critical if spec["critical"] else QueueError
-        output = self.command([*args, operation, *tail], fail=protected, label=f"Factory {operation}").stdout
-        backup = re.search(r"(?m)^Backup verified: ([a-z0-9T-]+)$", output)
+        process = self.command([*args, operation, *tail], label=f"Factory {operation}")
+        if process.returncode:
+            failure = process.stdout + process.stderr
+            if "Operation failed and the site was recovered" in failure:
+                raise Critical(f"Factory {operation} failed and verified recovery")
+            if "Unfinished operation. Run rollback" in failure:
+                raise Critical("Factory has an unfinished operation requiring rollback")
+            if "Another Factory operation owns" in failure and not spec["critical"]:
+                raise Retryable("Factory site is busy")
+            raise Critical(f"Factory {operation} failed (exit {process.returncode})")
+        backup = re.search(rf"(?m)^Backup verified: ({BACKUP_ID})$", process.stdout)
         if operation == "backup":
             if backup is None:
                 raise Critical("Factory backup did not report a verified identifier")

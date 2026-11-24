@@ -14,6 +14,7 @@ FACTORY = {"build", "health", *CRITICAL}
 OPERATIONS = {"code", "report", *FACTORY}
 IDENTIFIER = r"[a-z0-9][a-z0-9-]{0,39}"
 SHA = r"[0-9a-f]{40}"
+BACKUP_ID = r"[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}"
 BRANCH = r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}"
 GITHUB = r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+"
 PATH = r"[A-Za-z0-9_/-][A-Za-z0-9_./-]{0,199}"
@@ -133,7 +134,7 @@ class Project:
         elif ref is not None:
             raise QueueError("This operation takes no source commit")
         if operation == "restore":
-            if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}", backup or ""):
+            if not re.fullmatch(BACKUP_ID, backup or ""):
                 raise QueueError("Restore requires a Factory backup ID")
         elif backup is not None:
             raise QueueError("This operation takes no backup ID")

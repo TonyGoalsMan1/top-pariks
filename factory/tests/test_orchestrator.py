@@ -100,3 +100,13 @@ class RemoteContracts(unittest.TestCase):
         with self.assertRaisesRegex(Critical, "enforced strict checks"):
             adapter.merge({}, {})
         self.assertEqual(adapter.gh.call_count, 2)
+
+    def test_factory_backup_uses_the_emitted_identifier(self):
+        with tempfile.TemporaryDirectory() as state:
+            project = SimpleNamespace(profile="fixture.json", factory_source="/fixture")
+            job = {"id": "a" * 32, "spec": {"operation": "backup", "critical": True, "ref": None, "backup": None}}
+            adapter = Integrations(project, Path(state), job, 0)
+            adapter.command = Mock(return_value=SimpleNamespace(
+                returncode=0, stdout="Backup verified: 20261124T045249Z-f828c3506cc5\n"
+            ))
+            self.assertEqual(adapter.factory(), {"backup": "20261124T045249Z-f828c3506cc5"})

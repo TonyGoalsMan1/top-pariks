@@ -37,7 +37,7 @@ class Scenario:
             run("git", "init", "-q", "-b", "main", cwd=repo)
             run("git", "config", "user.name", "Fixture", cwd=repo)
             run("git", "config", "user.email", "fixture@example.invalid", cwd=repo)
-            (repo / "note.txt").write_text(f"Initial {project}\n")
+            (repo / "fixture.js").write_text(f'module.exports = () => "Initial {project}";\n')
             if self.wordpress:
                 profile = json.loads((REPO / "factory/sites/example-store.json").read_text())
                 profile.update(site_id=f"{project}-{uuid.uuid4().hex[:8]}", port=port,
@@ -65,8 +65,9 @@ class Scenario:
                 "id": project, "repository": project, "base": "main", "site_type": "woocommerce",
                 "domain": f"{project}.test", "environments": ["test"], "permissions": operations,
                 "agents": ["project-manager", "architect", "wordpress", "qa", "security"],
-                "executor": "mock", "budget": {}, "editable": ["note.txt"],
-                "mock": {"files": {"note.txt": f"Updated {project}\n"}, "fail_first": True},
+                "executor": "mock", "budget": {}, "editable": ["fixture.js"],
+                "mock": {"files": {"fixture.js": f'module.exports = () => "Updated {project}";\n'},
+                         "fail_first": True},
                 "wordpress_profile": f"{project}.json", "factory_source": project,
                 "timeout_seconds": 300, "retry_seconds": 0,
             })
@@ -131,7 +132,8 @@ class Scenario:
             self.check(architecture, "done")
             result = self.check(code, "done")["result"]
             checkout = Path(result["checkout"])
-            require((checkout / "note.txt").read_text() == f"Updated {project}\n", "Wrong project content")
+            require(run("node", "-p", 'require("./fixture.js")()', cwd=checkout) == f"Updated {project}",
+                    "Wrong project functionality")
             require(run("git", "rev-parse", "HEAD", cwd=checkout) == result["head"], "Missing real commit")
             require(run("git", "rev-parse", "HEAD", cwd=self.temp / project) == self.refs[project],
                     "Orchestrator modified the source repository")
