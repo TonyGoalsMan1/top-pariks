@@ -1,0 +1,9 @@
+[Unit]
+Description=Check WordPress Factory availability
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+
+[Install]
+WantedBy=timers.target

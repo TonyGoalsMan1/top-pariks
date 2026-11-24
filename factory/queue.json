@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "statuses": ["pending", "running", "blocked", "done"],
+  "retry_policies": {
+    "read_only": {
+      "max_attempts": 3,
+      "backoff_seconds": [10, 30],
+      "retry_on": ["transient_network_error", "temporary_runner_unavailable"],
+      "stop_on": ["invalid_configuration", "integrity_mismatch", "assertion_failure"]
+    },
+    "state_change": {
+      "max_attempts": 1,
+      "backoff_seconds": [],
+      "retry_on": [],
+      "stop_on": ["pending_journal", "failed_health", "integrity_mismatch"],
+      "before_retry": "Resolve the journal, verify recovery and fix the cause before submitting a new task."
+    }
+  },
+  "tasks": [
+    {
+      "id": "profiles",
+      "depends_on": [],
+      "status": "done",
+      "criteria": ["Two profiles provision separate Compose projects, databases and WordPress volumes."],
+      "retry_policy": "state_change",
+      "verify": "python3 factory/tests/lifecycle.py"
+    },
+    {
+      "id": "release",
+      "depends_on": ["profiles"],
+      "status": "done",
+      "criteria": ["Build the theme from a Git commit and verify its ZIP, manifest and SHA-256."],
+      "retry_policy": "read_only",
+      "verify": "python3 -m unittest discover -s factory/tests -v"
+    },
+    {
+      "id": "recovery",
+      "depends_on": ["release"],
+      "status": "done",
+      "criteria": ["Restore the database and files on existing and empty volumes.", "Reject corrupted and foreign snapshots.", "A failed storefront check rolls back the theme and preserves subsequent DB writes."],
+      "retry_policy": "state_change",
+      "verify": "python3 factory/tests/lifecycle.py"
+    },
+    {
+      "id": "github-ci",
+      "depends_on": ["recovery"],
+      "status": "done",
+      "criteria": ["Factory lifecycle and existing TOP-PARIKS CI pass for the PR."],
+      "retry_policy": "read_only",
+      "verify": ".github/workflows/factory.yml and .github/workflows/ci.yml",
+      "evidence": [45258606169, 45258603762]
+    },
+    {
+      "id": "staging-pilot",
+      "depends_on": ["github-ci"],
+      "status": "blocked",
+      "blocked_by": "Owner has not commissioned a separate authorized Linux staging host.",
+      "criteria": ["Run the disposable lifecycle on the new host.", "Verify private off-host copies and recovery before introducing real data."],
+      "retry_policy": "state_change",
+      "verify": "docs/STAGE-012.md"
+    },
+    {
+      "id": "server-infrastructure",
+      "depends_on": [
+        "github-ci"
+      ],
+      "status": "done",
+      "criteria": [
+        "Bootstrap and pinned SSH entry point for separate staging.",
+        "HTTPS proxy, isolated sites, encrypted backups, monitored rollback and task queue."
+      ],
+      "retry_policy": "state_change",
+      "verify": "factory/tests/server_bootstrap.sh and factory/tests/server_lifecycle.py"
+    },
+    {
+      "id": "server-activation",
+      "depends_on": [
+        "server-infrastructure"
+      ],
+      "status": "blocked",
+      "blocked_by": "Dedicated staging host, domain and private S3 bucket are owner-provided.",
+      "criteria": [
+        "Verify DNS and TLS, enable GitHub staging deployment and recover a private off-host copy."
+      ],
+      "retry_policy": "state_change",
+      "verify": "docs/STAGE-013.md"
+    },
+    {
+      "id": "autonomous-orchestrator",
+      "depends_on": [
+        "server-infrastructure"
+      ],
+      "status": "done",
+      "criteria": [
+        "Drain a persistent, permissioned queue on two isolated Git and WordPress projects.",
+        "Verify bounded retry, restart recovery, independent review, Factory health and rejected operations.",
+        "Keep paid AI and GitHub auto-merge disabled by default."
+      ],
+      "retry_policy": "read_only",
+      "verify": "python3 -B factory/tests/orchestrator_lifecycle.py --wordpress and the STAGE-014 PR checks"
+    },
+    {
+      "id": "control-center",
+      "depends_on": [
+        "autonomous-orchestrator"
+      ],
+      "status": "done",
+      "criteria": [
+        "Submit and control real queued jobs from a mobile PWA on two isolated projects.",
+        "Enforce project permissions, exact approvals and budget ceilings; reuse Factory recovery.",
+        "Exercise HTTP integration and the iPhone WebKit viewport alongside existing checks."
+      ],
+      "retry_policy": "read_only",
+      "verify": "python3 -B factory/tests/control_lifecycle.py --wordpress --browser and STAGE-015 PR checks",
+      "evidence": [45334470942, 45334470930]
+    },
+    {
+      "id": "integration-live-pilot",
+      "depends_on": [
+        "control-center"
+      ],
+      "status": "blocked",
+      "blocked_by": "Live acceptance requires owner access to a local host, an isolated GitHub repository and an authorized AI credential.",
+      "criteria": [
+        "Launch preflight, PWA, API and dispatcher with the same SQLite state.",
+        "Run protected CI and complete an authorized pilot with a real executor and physical iPhone."
+      ],
+      "retry_policy": "state_change",
+      "verify": "docs/STAGE-016.md"
+    }
+  ]
+}

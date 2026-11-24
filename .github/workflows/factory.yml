@@ -1,0 +1,78 @@
+name: WordPress Factory
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+      - '!production'
+      - '!production/**'
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    name: Factory lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate Factory configuration and artifacts
+        run: python3 -m unittest discover -s factory/tests -v
+      - name: Run two isolated WordPress and WooCommerce stores
+        run: python3 factory/tests/lifecycle.py
+
+  orchestrator:
+    name: Factory orchestrator integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Exercise local Git, crash recovery and two disposable WordPress sites
+        run: python3 -B factory/tests/orchestrator_lifecycle.py --wordpress
+
+  control-center:
+    name: Factory Control Center API and PWA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install Chromium and WebKit test engines
+        run: |
+          npm install --no-save --package-lock=false playwright-core@1.56.1
+          npx playwright-core install --with-deps chromium webkit
+      - name: Exercise protected HTTP and browser workflows on two disposable sites
+        env:
+          FACTORY_BROWSER_ARTIFACTS: ${{ runner.temp }}/factory-browser
+        run: |
+          mkdir -p "$FACTORY_BROWSER_ARTIFACTS"
+          python3 -B factory/tests/control_lifecycle.py --wordpress --browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-control-center-browser
+          path: ${{ runner.temp }}/factory-browser
+
+  server:
+    name: Factory server integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify bootstrap, HTTPS and restricted SSH on a disposable runner
+        run: bash factory/tests/server_bootstrap.sh
+      - name: Test isolated sites, rollback, encrypted local and S3 backups, and queue
+        run: |
+          python3 -m venv "$RUNNER_TEMP/factory-server-venv"
+          "$RUNNER_TEMP/factory-server-venv/bin/pip" install 'moto[server]==5.1.20'
+          FACTORY_TEST_S3=1 "$RUNNER_TEMP/factory-server-venv/bin/python" -B factory/tests/server_lifecycle.py

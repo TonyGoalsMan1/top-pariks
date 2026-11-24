@@ -1,0 +1,25 @@
+{
+  "site_id": "top-pariks",
+  "title": "TOP-PARIKS Factory Test",
+  "port": 8180,
+  "wordpress_image": "wordpress:6.9.1-php8.3-apache@sha256:ffef0dca1f0fc4357bfef3856ebd1ba18f7b394378277122eaa4524ca2619d43",
+  "database_image": "mariadb:11.4.10@sha256:3b4dfcc32247eb07adbebec0793afae2a8eafa6860ec523ee56af4d3dec42f7f",
+  "wp_cli": {
+    "url": "https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar",
+    "sha256": "ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c"
+  },
+  "woocommerce": {
+    "url": "https://github.com/woocommerce/woocommerce/releases/download/10.5.3/woocommerce.zip",
+    "sha256": "cfba4ef7f052b20d3f750257c2bd2e84ce214685625cf36753105b6f4febb760"
+  },
+  "theme": {"slug": "top-pariks", "source": "theme/top-pariks"},
+  "seed": "sandbox/seed.php",
+  "smoke": {
+    "home_text": "Парики для вашего образа",
+    "catalog_path": "/shop/",
+    "product_path": "/product/topqa-natural/",
+    "cart_path": "/cart/",
+    "product_name": "ТЕСТ — модель Atelier",
+    "cart_price": "19.00"
+  }
+}
