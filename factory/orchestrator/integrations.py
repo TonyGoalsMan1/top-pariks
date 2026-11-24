@@ -1,5 +1,6 @@
 """Trusted Git, GitHub and Factory operations. Executors cannot invoke these tools."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import sys
 import time
 
 from .executors import Critical, Retryable
-from .projects import BACKUP_ID
+from .projects import BACKUP_ID, SHA
 from .queue import QueueError
 
 
@@ -91,6 +92,8 @@ class Integrations:
                      auth=bool(self.project.github), fail=Retryable, label="Repository clone")
             staging.rename(self.checkout)
         base = result.get("base") or self.git("rev-parse", f"refs/remotes/origin/{self.project.base}").stdout.strip()
+        if self.project.preview_base and base != self.project.preview_base:
+            raise Critical("Test repository base differs from the pinned preview commit")
         self.git("checkout", "-B", self.branch, result.get("head") or base)
         self.git("reset", "--hard", result.get("head") or base)
         return base
@@ -252,12 +255,42 @@ class Integrations:
             raise Retryable("GitHub declined the protected merge")
         return True
 
+    def preview(self, result):
+        project = self.project
+        if os.environ.get("FACTORY_AUTHORIZE_TEST_PREVIEW") != "1":
+            raise Critical("Local preview deployment requires explicit owner authorization")
+        head, base = result["head"], result["base"]
+        if base != project.preview_base or not re.fullmatch(SHA, head):
+            raise Critical("Invalid reviewed preview commit")
+        self.git("merge-base", "--is-ancestor", base, head, fail=Critical,
+                 label="Require reviewed commit ancestry")
+        changed = self.git("diff", "--name-only", "--no-renames", "-z", base, head).stdout
+        css, = project.editable
+        entry = self.git("ls-tree", head, "--", css).stdout
+        if changed != css + "\0" or not entry.startswith("100644 blob "):
+            raise Critical("Preview must change only the regular theme stylesheet")
+        # Compare the bytes in the clean checkout with the bytes served by WordPress.
+        self.git("checkout", "--detach", head)
+        checksum = hashlib.sha256((self.checkout / css).read_bytes()).hexdigest()
+        release = self.directory / "preview-release"
+        args = self.factory_args(project.factory_source)
+        self.command([*self.factory_args(self.checkout), "build", release, "--ref", head],
+                     fail=Critical, label="Build reviewed preview")
+        self.command([*args, "verify-release", release], fail=Critical, label="Verify reviewed preview")
+        self.command([*args, "deploy", release, "--stylesheet-sha256", checksum],
+                     environment={name: os.environ[name] for name in DOCKER_ENV if name in os.environ},
+                     fail=Critical, label="Deploy and verify reviewed preview (inspect the Factory journal on failure)")
+        return {"operation": "deploy", "commit": head, "verified": True, "stylesheet_sha256": checksum}
+
+    def factory_args(self, repository):
+        return [sys.executable, "-B", FACTORY, "--site", self.project.profile,
+                "--state", self.state / "wordpress", "--repository", repository]
+
     def factory(self):
         spec = self.job["spec"]
         operation = spec["operation"]
         environment = {name: os.environ[name] for name in DOCKER_ENV if name in os.environ}
-        args = [sys.executable, "-B", FACTORY, "--site", self.project.profile,
-                "--state", self.state / "wordpress", "--repository", self.project.factory_source]
+        args = self.factory_args(self.project.factory_source)
         self.directory.mkdir(exist_ok=True)
         if spec["ref"]:
             release = self.directory / f"release-{self.job['attempt']}"

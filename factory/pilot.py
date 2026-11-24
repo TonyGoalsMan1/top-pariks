@@ -17,6 +17,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 from .control.__main__ import ASSETS, STATIC, Console, users
 from .orchestrator.__main__ import private_state
+from .orchestrator import codex
 from .orchestrator.executors import Critical, Retryable, api_key, model_access
 from .orchestrator.integrations import Integrations, timeout_command
 from .orchestrator.projects import integer, load
@@ -40,6 +41,8 @@ def check(args):
             commands.add("gh")
         if project.executor == "responses":
             commands.add("curl")
+        if project.executor == "codex":
+            commands.add("codex")
         for path in project.editable:
             tool = {".js": "node", ".php": "php"}.get(Path(path).suffix)
             if tool:
@@ -65,11 +68,23 @@ def check(args):
         tool = Integrations(project, state, {"id": "0" * 32}, None)
         if project.executor == "responses":
             key = api_key()
+        if project.executor == "codex":
+            codex.check(state)
         if project.github:
-            tool.gh("api", f"repos/{project.slug}", label="Test repository access", cwd=state)
+            repository = json.loads(tool.gh("api", f"repos/{project.slug}",
+                                            label="Test repository access", cwd=state))
         branch = f"refs/heads/{project.base}"
-        tool.git("ls-remote", "--exit-code", "--", project.repo, branch, cwd=state,
-                 auth=bool(project.github), label=f"Read test Git branch for {project.id}")
+        remote = tool.git("ls-remote", "--exit-code", "--", project.repo, branch, cwd=state,
+                          auth=bool(project.github), label=f"Read test Git branch for {project.id}")
+        if project.preview_base:
+            local = tool.git("rev-parse", branch, cwd=project.factory_source).stdout.strip()
+            if (not repository["private"] or repository["fork"] or repository["default_branch"] != project.base
+                    or not (repository.get("permissions") or {}).get("push")
+                    or remote.stdout.strip() != f"{project.preview_base}\t{branch}"
+                    or local != project.preview_base):
+                raise QueueError("Preview requires a writable private test repository with the pinned base")
+            if os.environ.get("FACTORY_AUTHORIZE_TEST_PREVIEW") != "1":
+                raise QueueError("Set FACTORY_AUTHORIZE_TEST_PREVIEW=1 after authorizing local deployment")
         if project.profile:
             check_site(project, factory, state, args.port)
         if project.executor == "responses":
@@ -123,7 +138,8 @@ def serve(args, state):
     base = [sys.executable, "-B", "-m"]
     common = ["--config", str(args.config.resolve()), "--state", str(state)]
     web_env = dict(os.environ)
-    for name in ("OPENAI_API_KEY", "FACTORY_AUTHORIZE_PAID_AI", "FACTORY_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"):
+    for name in ("OPENAI_API_KEY", "FACTORY_AUTHORIZE_PAID_AI", "FACTORY_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
+                 "CODEX_HOME", "CODEX_API_KEY", "FACTORY_AUTHORIZE_CODEX_CHATGPT", "FACTORY_AUTHORIZE_TEST_PREVIEW"):
         web_env.pop(name, None)
     processes = []
     stopping = False

@@ -11,11 +11,11 @@ from factory.orchestrator.queue import approval_version
 OPERATIONS = FACTORY - {"rollback"}
 RESULT_FIELDS = {
     "base", "head", "branch", "summary", "review", "pr", "checks", "pr_state", "merge_state",
-    "merged", "merge_source", "failure", "commit", "operation", "verified", "backup",
+    "merged", "merge_source", "failure", "commit", "operation", "verified", "backup", "stylesheet_sha256",
 }
 EVENT_FIELDS = RESULT_FIELDS | {
     "role", "phase", "attempt", "scope", "version", "recovery", "reason", "task", "microdollars",
-    "project_reserved", "input_tokens", "output_tokens", "estimated_microdollars",
+    "project_reserved", "input_tokens", "output_tokens", "estimated_microdollars", "calls_reserved",
 }
 NOTICES = {
     "done": "Задача завершена", "failed": "Ошибка задачи", "blocked": "Задача заблокирована",
@@ -110,6 +110,13 @@ def dashboard(queue, state, project):
         "FROM events e JOIN jobs j ON j.id=e.job WHERE j.project=? AND e.event='ai_usage'", (project.id,)
     ).fetchone()
     heartbeat = queue.db.execute("SELECT heartbeat FROM runtime WHERE id=1").fetchone()
+    codex_budget = {}
+    if project.executor == "codex":
+        calls = queue.db.execute(
+            "SELECT count(*) FROM events e JOIN jobs j ON j.id=e.job "
+            "WHERE j.project=? AND e.event='codex_call_reserved'", (project.id,)
+        ).fetchone()[0]
+        codex_budget = {"calls_reserved": calls, "max_calls": project.budget["max_calls"]}
     return {
         **listing, "project": project.id, "executor": project.executor, "notifications": notices,
         "task_count": queue.db.execute("SELECT COUNT(*) FROM jobs WHERE project=?", (project.id,)).fetchone()[0],
@@ -123,5 +130,5 @@ def dashboard(queue, state, project):
                        limit_microdollars=queue.budget_limit(project),
                        reserved_microdollars=budget[0] if budget else 0,
                        input_tokens=totals[0] or 0, output_tokens=totals[1] or 0,
-                       estimated_microdollars=totals[2] or 0),
+                       estimated_microdollars=None if codex_budget else totals[2] or 0, **codex_budget),
     }

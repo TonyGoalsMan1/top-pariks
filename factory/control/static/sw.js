@@ -1,4 +1,4 @@
-const cacheName = 'factory-shell-v1';
+const cacheName = 'factory-shell-v2';
 const shell = ['/', '/app.js', '/app.css', '/manifest.webmanifest', '/icon-180.png',
   '/icon-192.png', '/icon-512.png'];
 

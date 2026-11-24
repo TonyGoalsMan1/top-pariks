@@ -11,12 +11,13 @@ const operations = {
   code: 'Разработка', report: 'Отчёт', build: 'Сборка', start: 'Запуск стенда',
   health: 'Проверка стенда', backup: 'Создать копию', restore: 'Восстановить снимок', deploy: 'Публикация на тест',
 };
-const phases = { execute: 'Исполнение', publish: 'Открытие PR', ci: 'Проверки CI', merge: 'Ожидание слияния' };
+const phases = { execute: 'Исполнение', publish: 'Открытие PR', ci: 'Проверки CI', merge: 'Ожидание слияния',
+  preview: 'Развёртывание на локальном тесте' };
 const eventLabel = {
   ...statusLabel, started: 'Этап начат', held: 'Приостановлена', released: 'Возвращена в очередь',
   approved: 'Действие подтверждено', interrupted: 'Прервана', automatic_pause: 'Аварийная пауза',
   cancel_requested: 'Запрошена отмена', retried_from: 'Создан повтор', budget_reserved: 'Бюджет зарезервирован',
-  ai_usage: 'Получена статистика токенов',
+  ai_usage: 'Получена статистика токенов', codex_call_reserved: 'Зарезервирован вызов Codex',
 };
 
 let account;
@@ -190,20 +191,26 @@ function renderTasks() {
 function renderDashboard() {
   const data = snapshot;
   const editable = project.role !== 'viewer';
+  const codex = data.executor === 'codex';
   $('project-title').textContent = data.project;
-  $('executor').textContent = data.executor === 'mock' ? 'Демонстрация · Mock' : 'OpenAI Responses';
+  $('executor').textContent = { mock: 'Демонстрация · Mock', responses: 'OpenAI Responses',
+    codex: 'Codex · ChatGPT' }[data.executor];
   $('dispatcher').textContent = data.dispatcher_paused ? 'На общей паузе' :
     data.dispatcher_online ? 'В сети' : 'Не в сети';
   $('queue-state').textContent = data.paused ? 'Приостановлена' : 'Принимает задачи';
   $('toggle-pause').textContent = data.paused ? 'Возобновить очередь' : 'Остановить очередь';
   $('toggle-pause').hidden = !editable;
-  $('cost').textContent = money(data.budget.estimated_microdollars) + ' · оценка';
+  $('cost').textContent = codex ? 'Квота ChatGPT · сумма недоступна' :
+    money(data.budget.estimated_microdollars) + ' · оценка';
   const budget = data.budget;
-  description($('budget'), [
+  const limits = codex ? [['Зарезервировано вызовов', budget.calls_reserved + ' / ' + budget.max_calls]] : [
     ['Модель', budget.model || 'Mock'], ['Зарезервировано', money(budget.reserved_microdollars)],
     ['Бюджет проекта', money(budget.total_microdollars || 0)],
     ['Действующий лимит', money(budget.limit_microdollars)],
     ['Лимиты ввода / вывода', (budget.max_input_tokens || 0) + ' / ' + (budget.max_output_tokens || 0)],
+  ];
+  description($('budget'), [
+    ...limits,
     ['Учтённые токены ввода / вывода', budget.input_tokens + ' / ' + budget.output_tokens],
   ]);
   $('budget-form').hidden = !account.owner || data.executor !== 'responses';
@@ -322,7 +329,8 @@ function taskDetails(task) {
   if (project.role !== 'viewer' && !task.cancelling) {
     const actions = element('div', undefined, 'actions');
     if (terminal.has(task.status)) {
-      if (!task.spec.critical || (task.status === 'cancelled' && task.attempt === 0)) {
+      if ((!task.spec.critical && !(task.phase === 'preview' && task.status === 'blocked')) ||
+        (task.status === 'cancelled' && task.attempt === 0)) {
         actions.append(control('Повторить задачу', () => changeTask(task.id, 'retry')));
       }
     } else {

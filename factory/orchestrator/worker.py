@@ -44,8 +44,15 @@ class Worker:
             finally:
                 queue.db.close()
 
+        def reserve_codex():
+            queue = Queue(self.db_path)
+            try:
+                queue.reserve_codex(project, job["id"])
+            finally:
+                queue.db.close()
+
         outcome = execute(project, job, role, payload, reserve, self.lease,
-                          review=review, record_usage=record_usage)
+                          review=review, record_usage=record_usage, reserve_codex=reserve_codex)
         definition = schema(job["spec"]["operation"] == "code" and not review, review)
         if (not isinstance(outcome, dict) or set(outcome) != set(definition["required"])
                 or not isinstance(outcome["summary"], str)
@@ -69,9 +76,10 @@ class Worker:
         if phase == "execute" and job["attempt"] > project.max_attempts:
             raise QueueError("Retry limit exhausted during restart recovery")
         tool = Integrations(project, self.state, job, self.lease)
-        if spec["operation"] in FACTORY:
+        if spec["operation"] in FACTORY or phase == "preview":
             if hashlib.sha256(project.profile.read_bytes()).hexdigest() != project.profile_digest:
                 raise Critical("Factory profile changed since project registration")
+        if spec["operation"] in FACTORY:
             return next_step("done", phase, tool.factory())
         if result.get("ci_deadline", float("inf")) <= time.time():
             raise QueueError("GitHub publication, CI or review deadline exceeded")
@@ -120,8 +128,13 @@ class Worker:
                 return next_step("queued", phase, result, 5)
             review = self.review(project, job, tool.diff(result["base"], result["head"]),
                                  {name: "success" for name in project.github["required_checks"]})
-            return next_step("queued", "merge", dict(result, review=review,
-                                                      merge_state=pr["mergeStateStatus"]))
+            return next_step("queued", "preview" if project.preview_base else "merge",
+                             dict(result, review=review, merge_state=pr["mergeStateStatus"]))
+        if phase == "preview":
+            pending, failed = tool.checks(result["head"])
+            if pending or failed:
+                raise Critical("Required CI changed after review")
+            return next_step("done", phase, dict(result, **tool.preview(result)))
         if (project.github.get("auto_merge") and job["approved"] == result["head"]
                 and pr["mergeStateStatus"] == "CLEAN" and tool.merge(pr, result)):
             return next_step("done", phase, dict(result, merged=True, merge_source="orchestrator"))

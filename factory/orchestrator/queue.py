@@ -165,6 +165,8 @@ class Queue:
                 raise QueueError("Project registration changed; submit a new task")
             if row["status"] not in TERMINAL:
                 raise QueueError("Task must end before it can be retried")
+            if row["phase"] == "preview" and row["status"] == "blocked":
+                raise QueueError("Inspect Factory recovery before submitting a new preview")
             if row["spec"]["critical"] and (row["attempt"] or row["status"] != "cancelled"):
                 raise QueueError("Inspect Factory recovery before submitting a new operation")
             dependencies = self.dependencies(job)
@@ -239,7 +241,7 @@ class Queue:
                     WHERE d.job=j.id AND p.status!='done')
                 AND NOT EXISTS (SELECT 1 FROM jobs owner WHERE owner.resource=j.resource
                     AND owner.id!=j.id AND (owner.status='running' OR
-                    (owner.status='queued' AND (owner.phase IN ('publish','ci','merge')
+                    (owner.status='queued' AND (owner.phase IN ('publish','ci','merge','preview')
                     OR json_extract(owner.result,'$.pr') IS NOT NULL))))
                 ORDER BY j.priority DESC,j.created,j.id LIMIT 1""", (time.time(),)
             ).fetchone()
@@ -281,7 +283,7 @@ class Queue:
     def recover(self):
         with self.transaction():
             for row in self.db.execute("SELECT id,spec,phase,cancel FROM jobs WHERE status='running'"):
-                critical = json.loads(row["spec"])["critical"]
+                critical = json.loads(row["spec"])["critical"] or row["phase"] == "preview"
                 status = "blocked" if critical else "cancelled" if row["cancel"] else "queued"
                 self.db.execute("UPDATE jobs SET status=? WHERE id=?", (status, row["id"]))
                 self.event(row["id"], "interrupted", phase=row["phase"], recovery=status)
@@ -312,3 +314,13 @@ class Queue:
         with self.transaction():
             self.event(job, "ai_usage", input_tokens=usage["input_tokens"],
                        output_tokens=usage["output_tokens"], estimated_microdollars=estimated)
+
+    def reserve_codex(self, project, job):
+        with self.transaction():
+            used = self.db.execute(
+                "SELECT count(*) FROM events e JOIN jobs j ON j.id=e.job "
+                "WHERE j.project=? AND e.event='codex_call_reserved'", (project.id,)
+            ).fetchone()[0]
+            if used >= project.budget["max_calls"]:
+                raise QueueError("Project Codex call limit exhausted")
+            self.event(job, "codex_call_reserved", calls_reserved=used + 1)

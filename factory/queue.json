@@ -127,6 +127,19 @@
       ],
       "retry_policy": "state_change",
       "verify": "docs/STAGE-016.md"
+    },
+    {
+      "id": "real-autonomous-pilot",
+      "depends_on": ["integration-live-pilot"],
+      "status": "blocked",
+      "blocked_by": "Owner must authorize existing Codex allowance and test deployment, provision the private GitHub credential and submit from a physical iPhone.",
+      "criteria": [
+        "Submit a synthetic storefront task from the physical iPhone via private HTTPS.",
+        "Record a real Codex proposal, Git commit, GitHub PR, exact check success and independent review.",
+        "Deploy the reviewed stylesheet to isolated WooCommerce and record health, stylesheet hash and usage."
+      ],
+      "retry_policy": "state_change",
+      "verify": "docs/STAGE-017.md"
     }
   ]
 }
