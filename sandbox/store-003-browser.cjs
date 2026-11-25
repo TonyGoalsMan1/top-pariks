@@ -57,7 +57,13 @@ async function catalog(page) {
         await select.selectOption('blond');
         await page.locator('.single_add_to_cart_button.wc-variation-is-unavailable').waitFor();
     }
-    console.log('Catalog, search, sorting, three attributes, price and variation passed.');
+    await select.selectOption('chestnut');
+    await page.locator('.single_add_to_cart_button:not(.disabled)').click();
+    await open(page, '/cart/');
+    await page.getByText('Тестовая доставка', {exact:true}).waitFor();
+    await page.locator('.cart_item a.remove').click();
+    await page.locator('.cart-empty').waitFor();
+    console.log('Catalog, search, sorting, three attributes, price, variation and test shipping passed.');
 }
 
 async function addProduct(page) {
@@ -155,7 +161,9 @@ async function account(page, email, password) {
     await page.locator('[name=save_account_details]').click();
     await page.locator('.woocommerce-message').waitFor();
 
-    await open(page, '/my-account/edit-address/shipping/');
+    await open(page, '/my-account/edit-address/');
+    await page.locator('a[href*="/edit-address/shipping/"]').click();
+    await page.locator('#shipping_first_name').waitFor();
     await fillAddress(page, 'shipping');
     await page.locator('[name=save_address]').click();
     await page.locator('.woocommerce-message').waitFor();

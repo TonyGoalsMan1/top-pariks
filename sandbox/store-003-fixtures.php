@@ -114,7 +114,7 @@ foreach (['chestnut' => ['24.00', 8], 'blond' => ['26.00', 0]] as $color => [$pr
     $variation->set_sku($sku);
     $variation->set_status('publish');
     $variation->set_attributes(['pa_color' => $color]);
-    $variation->set_virtual(true);
+    $variation->set_virtual(false);
     $variation->set_regular_price($price);
     $variation->set_manage_stock(true);
     $variation->set_stock_quantity($quantity);
@@ -128,6 +128,33 @@ $cod['description'] = 'Проверка оформления заказа. Де�
 $cod['instructions'] = 'Это тестовый заказ. Оплата не требуется.';
 update_option('woocommerce_cod_settings', $cod);
 update_option('woocommerce_coming_soon', 'no');
+update_option('woocommerce_ship_to_countries', 'specific');
+update_option('woocommerce_specific_ship_to_countries', ['US']);
+update_option('woocommerce_ship_to_destination', 'shipping');
+$zone = null;
+foreach (WC_Shipping_Zones::get_zones() as $configured_zone) {
+    if ('ТЕСТ — доставка' === $configured_zone['zone_name']) {
+        $zone = WC_Shipping_Zones::get_zone($configured_zone['zone_id']);
+        break;
+    }
+}
+if (!$zone) {
+    $zone = new WC_Shipping_Zone();
+    $zone->set_zone_name('ТЕСТ — доставка');
+    $zone->add_location('US', 'country');
+    $zone->save();
+}
+if (!$zone->get_shipping_methods()) {
+    $instance_id = $zone->add_shipping_method('flat_rate');
+    if (!$instance_id) {
+        throw new RuntimeException('Cannot create sandbox shipping method.');
+    }
+    update_option('woocommerce_flat_rate_' . $instance_id . '_settings', [
+        'title' => 'Тестовая доставка',
+        'cost' => '0',
+        'tax_status' => 'none',
+    ]);
+}
 
 $store_page_titles = [
     'shop' => ['Shop', 'Каталог'],

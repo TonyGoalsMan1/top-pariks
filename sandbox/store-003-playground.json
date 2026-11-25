@@ -16,7 +16,7 @@
       "step": "installTheme",
       "themeData": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/p0/store-003-acceptance/top-pariks.zip?v=store003"
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/p0/store-003-acceptance/top-pariks.zip?v=store003-shipping"
       },
       "options": {
         "activate": true
@@ -53,7 +53,7 @@
       "path": "/tmp/top-pariks-store-003.php",
       "data": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/p0/store-003-acceptance/sandbox/store-003-fixtures.php?v=store003"
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/p0/store-003-acceptance/sandbox/store-003-fixtures.php?v=store003-shipping"
       }
     },
     {
