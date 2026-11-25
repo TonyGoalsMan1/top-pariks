@@ -1,6 +1,9 @@
 <?php
 defined('ABSPATH') || exit;
 
+// This isolated store must be accessible to guests.
+update_option('woocommerce_coming_soon', 'no');
+
 foreach ([
     'material' => ['Материал', ['Натуральные волосы', 'Искусственное волокно']],
     'length' => ['Длина', ['Длинные', 'Короткие']],
