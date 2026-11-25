@@ -1,4 +1,13 @@
-<?php get_header(); ?>
+<?php
+if (is_product() && apply_filters('woocommerce_single_product_flexslider_enabled', get_theme_support('wc-product-gallery-slider'))) {
+    add_filter('woocommerce_single_product_image_gallery_classes', static function ($classes) {
+        $classes[] = 'tp-stable-gallery';
+        return $classes;
+    });
+}
+
+get_header();
+?>
 <div class="wrap page-content">
     <?php
     if (is_shop() || is_product_category() || is_product_tag() || is_search()) :

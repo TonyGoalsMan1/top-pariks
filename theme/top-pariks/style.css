@@ -3,7 +3,7 @@ Theme Name: TOP-PARIKS Atelier
 Theme URI: https://example.com/top-pariks-atelier
 Author: TOP-PARIKS Development
 Description: Responsive boutique storefront with WooCommerce-ready product listings. Demo images are cropped from the supplied design reference and should be replaced before production.
-Version: 1.3.0
+Version: 1.3.1
 Requires at least: 6.2
 Requires PHP: 7.4
 Text Domain: top-pariks
@@ -582,3 +582,32 @@ body { line-height: 1.6; }
 }
 
 .atelier-care-link a { color: var(--accent-dark); text-decoration: underline; text-underline-offset: .2em; }
+
+/* Reserve the same gallery geometry before and after WooCommerce starts FlexSlider. */
+.woocommerce div.product div.images.tp-stable-gallery {
+    --atelier-thumb-size: clamp(52px, 10vw, 78px);
+}
+@media (scripting: enabled) {
+    .tp-stable-gallery > .woocommerce-product-gallery__wrapper > .woocommerce-product-gallery__image:not(:first-child) {
+        display: none;
+    }
+    .tp-stable-gallery > .woocommerce-product-gallery__wrapper:has(> .woocommerce-product-gallery__image:nth-child(2))::after {
+        content: "";
+        display: block;
+        block-size: calc(var(--atelier-thumb-size) + 24px);
+    }
+}
+.woocommerce div.product div.images.tp-stable-gallery .flex-control-thumbs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+.woocommerce div.product div.images.tp-stable-gallery .flex-control-thumbs li {
+    flex: 0 0 var(--atelier-thumb-size);
+    width: var(--atelier-thumb-size);
+}
+.woocommerce div.product div.images.tp-stable-gallery .flex-control-thumbs img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+}

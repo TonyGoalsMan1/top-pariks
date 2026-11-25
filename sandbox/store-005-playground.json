@@ -16,7 +16,7 @@
       "step": "installTheme",
       "themeData": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/store-005/launch-prep/top-pariks.zip?v=store005"
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/store-005/launch-prep/top-pariks.zip?v=store005-gallery"
       },
       "options": {
         "activate": true
