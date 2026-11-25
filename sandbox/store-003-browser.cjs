@@ -29,15 +29,31 @@ async function catalog(page) {
     const cards = page.locator('ul.products > li.product');
     assert.equal(await cards.count(), 3);
     assert.equal(await cards.filter({hasText:'Studio'}).locator('img.woocommerce-placeholder').count(), 1);
+    const showFilters = async () => {
+        const toggle = page.locator('.atelier-filter-toggle');
+        if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') === 'false') {
+            await toggle.click();
+        }
+    };
     const filters = page.getByRole('form', {name:'Фильтры каталога'});
     for (const [field, value] of [['filter_material','natural'],['filter_length','long'],['filter_color','chestnut']]) {
+        await showFilters();
         await filters.locator('[name=' + field + ']').selectOption(value);
         await filters.getByRole('button', {name:'Применить'}).click();
         await page.waitForURL(url => url.searchParams.get(field) === value);
         assert.match(await cards.first().innerText(), /Atelier/);
     }
     assert.equal(await cards.count(), 1);
-    await filters.getByRole('link', {name:'Сбросить'}).click();
+    const chips = page.getByRole('list', {name:'Выбранные фильтры'});
+    if (await chips.count()) {
+        await chips.getByRole('link', {name:/Удалить фильтр Цвет/}).click();
+        assert.match(await chips.innerText(), /Материал/);
+        await chips.getByRole('link', {name:'Сбросить все'}).click();
+    } else {
+        await showFilters();
+        await filters.getByRole('link', {name:'Сбросить'}).click();
+    }
+    await showFilters();
     await filters.locator('[name=min_price]').fill('20');
     await filters.getByRole('button', {name:'Применить'}).click();
     await page.waitForURL(url => url.searchParams.get('min_price') === '20');
@@ -241,6 +257,15 @@ async function resetPassword(page, email, password) {
         assert.match(await page.locator('ul.products').innerText(), /выбором цвета/);
         const privacyUrl = await page.locator('footer a').filter({hasText:'Политика конфиденциальности'}).getAttribute('href');
         await open(page, privacyUrl);
+        if (process.env.TOP_PARIKS_STORE004 === 'yes') {
+            for (const path of ['/about/', '/contacts/', '/delivery/', '/returns/', '/wig-guide/', '/wig-care/', '/faq/', privacyUrl, '/cart/', '/product/topqa-choice/']) {
+                await open(page, path);
+                await page.setViewportSize({width:390,height:844});
+                await noOverflow(page, path, 390);
+                const slug = new URL(path, origin).pathname.replaceAll('/', '-');
+                await page.screenshot({path:samples + '/' + slug + '390.png', fullPage:true});
+            }
+        }
         await open(page, '/topqa-missing-page/', 404);
         await open(page, '/shop/?filter_material=natural');
         assert.match(await page.locator('meta[name=robots]').getAttribute('content'), /noindex/);

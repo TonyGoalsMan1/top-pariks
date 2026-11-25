@@ -2,7 +2,7 @@ name: STORE-003 acceptance
 
 on:
   push:
-    branches: [p0/store-003-acceptance]
+    branches: [p0/store-003-acceptance, store-004/demo]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,41 @@ jobs:
           wp eval-file - < sandbox/store-003-fixtures.php
           wp eval 'printf("WordPress %s, WooCommerce %s, locale %s\n", get_bloginfo("version"), WC_VERSION, get_locale()); foreach (["shop", "cart", "checkout", "myaccount"] as $page) { if (wc_get_page_id($page) < 1) { WP_CLI::error($page); } }'
           wp plugin list --status=must-use
+      - name: Package and restore the demonstration independently
+        if: github.ref == 'refs/heads/store-004/demo'
+        env:
+          ATELIER_RESTORE_PROJECT: atelier-restore-ci
+          ATELIER_DEMO_DB_PASSWORD: isolated-ci-demo-db
+          ATELIER_DEMO_PORT: 8086
+        run: |
+          set -euo pipefail
+          wp() { docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" "$@"; }
+          wp eval-file - < sandbox/store-004-content.php
+          bash sandbox/store-004-package.sh "$RUNNER_TEMP/atelier-portable"
+          (
+            cd "$RUNNER_TEMP/atelier-portable"
+            dc=(docker compose -p "$ATELIER_RESTORE_PROJECT" -f compose.yaml)
+            trap '"${dc[@]}" down --volumes' EXIT
+            bash restore.sh
+            for route in / /shop/ /product/topqa-natural/ /product/topqa-choice/ /cart/ /my-account/ /wig-care/; do
+              curl -fsSL --max-time 20 "http://localhost:8086$route" -o "$RUNNER_TEMP/restore-response.html"
+            done
+            "${dc[@]}" exec -T --user www-data wordpress php /tmp/atelier-wp-cli.phar --url=http://localhost:8086 eval '
+              $p = wc_get_product(wc_get_product_id_by_sku("TOPQA-NATURAL"));
+              $v = wc_get_product(wc_get_product_id_by_sku("TOPQA-CHOICE"));
+              if (!$p || !is_file(get_attached_file($p->get_image_id())) || !$v || count($v->get_children()) !== 2 || get_locale() !== "ru_RU" || home_url() !== "http://localhost:8086") {
+                 WP_CLI::error("Post-restore data checks failed");
+              }
+              WP_CLI::success("Independent restore verified: database, image file, variations, locale and new URL.");
+            '
+          )
+          echo 'TOP_PARIKS_STORE004=yes' >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/store-004/demo'
+        with:
+          name: atelier-portable
+          path: ${{ runner.temp }}/atelier-portable/
+          retention-days: 14
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

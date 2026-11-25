@@ -212,3 +212,11 @@ function tp_normalize_catalog_filters() {
     }
 }
 add_action('parse_request', 'tp_normalize_catalog_filters', 1);
+
+function tp_product_care_guide() {
+    $url = tp_published_page_url('wig-care');
+    if ($url) {
+        printf('<p class="atelier-care-link"><a href="%s">%s</a></p>', esc_url($url), esc_html__('Как ухаживать за париком', 'top-pariks'));
+    }
+}
+add_action('woocommerce_single_product_summary', 'tp_product_care_guide', 45);
