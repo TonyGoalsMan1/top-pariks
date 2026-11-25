@@ -3,7 +3,7 @@ Theme Name: TOP-PARIKS Atelier
 Theme URI: https://example.com/top-pariks-atelier
 Author: TOP-PARIKS Development
 Description: Responsive boutique storefront with WooCommerce-ready product listings. Demo images are cropped from the supplied design reference and should be replaced before production.
-Version: 1.1.1
+Version: 1.2.0
 Requires at least: 6.2
 Requires PHP: 7.4
 Text Domain: top-pariks
@@ -420,4 +420,54 @@ img { max-width: 100%; }
         content: attr(data-title) ": ";
         float: left;
     }
+}
+/* Atelier homepage */
+body.home .topbar { background: #2b1b19; font-size: .875rem; }
+body.home .mast { background: #fffdf9; }
+body.home .brand { color: #452721; }
+body.home .nav { background: #fbf5ef; }
+body.home .nav a:hover, body.home .nav a[aria-current="page"] { color: #753b30; }
+body.home .header-actions .cart-link { background: #efe1d5; }
+.atelier-home { --atelier-wine: #552d30; --atelier-cream: #f2e7db; overflow-wrap: anywhere; }
+.atelier-home .hero-inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); background: var(--atelier-wine); color: #fff8ee; }
+.atelier-home .hero-copy { padding: clamp(24px, 5vw, 72px); }
+.atelier-home .hero h1 { max-width: 13ch; font-size: clamp(38px, 5.5vw, 80px); }
+.atelier-home .hero p { color: #f1ded4; }
+.atelier-home .hero .atelier-label { margin-bottom: 14px; font-size: .875rem; letter-spacing: .12em; text-transform: uppercase; }
+.atelier-home .hero .btn { background: #f7e5d3; color: #452721; }
+.atelier-home .hero .btn:hover { background: #fff8ee; }
+.atelier-home .hero :focus-visible { outline-color: #fff8ee; }
+.atelier-home .hero-image { inset: 0; width: 100%; object-position: center 34%; }
+.atelier-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; }
+.atelier-link { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
+.atelier-home .hero .atelier-link:hover { color: #fff8ee; }
+.atelier-home .section { padding-block: clamp(22px, 4vw, 48px); }
+.atelier-home .section + .section { padding-top: 0; }
+.atelier-home .section-head { margin-bottom: 18px; }
+.atelier-home .category { background: #fffaf4; border-radius: 12px; }
+.atelier-home .category img { aspect-ratio: 5 / 4; }
+.atelier-home .category span { padding-block: 13px; }
+.atelier-home .product .btn { align-self: flex-start; }
+.atelier-benefits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
+.atelier-benefits li { padding: clamp(16px, 3vw, 28px); border: 1px solid var(--line); border-radius: 12px; background: #fffaf4; }
+.atelier-benefits h3 { margin: 0 0 8px; font: normal 1.45rem/1.2 var(--serif); }
+.atelier-benefits p { margin: 0; color: var(--muted); }
+.atelier-help { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: clamp(20px, 4vw, 42px); border-radius: 12px; background: var(--atelier-cream); }
+.footer-atelier { background: #2b1b19; color: #fff8ee; }
+.footer-atelier .footer-inner { align-items: flex-start; }
+.footer-atelier nav { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.footer-atelier a { display: inline-flex; align-items: center; min-height: 44px; }
+.footer-atelier a:hover { color: #f1ded4; }
+.footer-atelier a:focus-visible { outline-color: #fff8ee; }
+.footer-atelier .footer-brand { margin-block: 6px; font: 1.5rem/1.2 var(--serif); }
+@media (max-width: 680px) {
+    .atelier-home .hero-inner, .atelier-benefits { grid-template-columns: minmax(0, 1fr); }
+    .atelier-home .hero-media { min-height: clamp(210px, 63vw, 390px); }
+    .atelier-home .hero-copy { order: 1; }
+}
+@media (max-width: 420px) {
+    body.home .mast-inner { align-items: flex-start; }
+    body.home .brand { flex-basis: 100%; }
+    body.home .header-actions { justify-content: flex-start; max-width: 100%; flex-wrap: wrap; }
+    .atelier-home .category span { font-size: .875rem; }
 }

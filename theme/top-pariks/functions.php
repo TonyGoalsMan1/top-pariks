@@ -27,6 +27,43 @@ function tp_image($name){return esc_url(get_template_directory_uri().'/assets/im
 function tp_catalog_url(){return class_exists('WooCommerce')?wc_get_page_permalink('shop'):home_url('/');}
 function tp_cart_url(){return class_exists('WooCommerce')?wc_get_cart_url():home_url('/');}
 function tp_products(){if(!class_exists('WooCommerce'))return [];return wc_get_products(['limit'=>4,'status'=>'publish','orderby'=>'date','order'=>'DESC']);}
+
+function tp_homepage_products($featured = false) {
+    if (!function_exists('wc_get_product_visibility_term_ids')) {
+        return [];
+    }
+
+    $visibility = wc_get_product_visibility_term_ids();
+    $excluded = [$visibility['exclude-from-catalog']];
+    if ('yes' === get_option('woocommerce_hide_out_of_stock_items')) {
+        $excluded[] = $visibility['outofstock'];
+    }
+
+    $tax_query = [[
+        'taxonomy' => 'product_visibility',
+        'field' => 'term_taxonomy_id',
+        'terms' => $excluded,
+        'operator' => 'NOT IN',
+    ]];
+    if ($featured) {
+        $tax_query[] = [
+            'taxonomy' => 'product_visibility',
+            'field' => 'term_taxonomy_id',
+            'terms' => [$visibility['featured']],
+        ];
+    }
+
+    $query = new WP_Query([
+        'post_type' => 'product',
+        'post_status' => 'publish',
+        'has_password' => false,
+        'posts_per_page' => 4,
+        'no_found_rows' => true,
+        'fields' => 'ids',
+        'tax_query' => $tax_query,
+    ]);
+    return array_values(array_filter(array_map('wc_get_product', $query->posts)));
+}
 function tp_published_page_url($slug) {
     $page = get_page_by_path($slug, OBJECT, ['page']);
     return $page && 'publish' === $page->post_status ? get_permalink($page) : '';
