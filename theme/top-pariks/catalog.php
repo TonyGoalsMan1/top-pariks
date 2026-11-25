@@ -17,7 +17,12 @@ function tp_catalog_filters() {
         return;
     }
 
-    $url = is_product_taxonomy() ? get_term_link(get_queried_object()) : tp_catalog_url();
+    $url = tp_catalog_url();
+    if (is_search()) {
+        $url = home_url('/');
+    } elseif (is_product_taxonomy()) {
+        $url = get_term_link(get_queried_object());
+    }
     if (is_wp_error($url)) {
         return;
     }
