@@ -221,7 +221,16 @@ async function verifyStore004Admin(admin) {
     await admin.locator('#submit').click();
     await admin.locator('#the-list').getByText('ТЕСТ — категория администратора', {exact:true}).waitFor();
     assert.ok(wp('term', 'list', 'product_cat', '--slug=store004-admin-category', '--field=term_id'));
-    console.log('STORE-004: product price, stock, variation, media upload and category creation passed in wp-admin.');
+    await open(admin, '/wp-admin/edit.php?post_type=page');
+    const faq = admin.locator('tr').filter({has: admin.locator('a.row-title').filter({hasText:'Часто задаваемые вопросы'})});
+    await faq.hover();
+    await faq.locator('button.editinline').click();
+    const quickEdit = admin.locator('tr.inline-editor');
+    await quickEdit.locator('input[name=post_title]').fill('Часто задаваемые вопросы — проверка');
+    await quickEdit.locator('button.save').click();
+    await admin.locator('a.row-title').filter({hasText:'Часто задаваемые вопросы — проверка'}).waitFor();
+    assert.equal(wp('eval', "echo get_page_by_path('faq')->post_title;"), 'Часто задаваемые вопросы — проверка');
+    console.log('STORE-004: price, stock, variation, media, category and information page editing passed in wp-admin.');
 }
 
 async function login(page, username, password) {
@@ -263,7 +272,23 @@ async function resetPassword(page, email, password) {
     console.log('Password reset by intercepted email and fresh login passed.');
 }
 
+async function checkWebkit() {
+    if (process.env.TOP_PARIKS_TEST_WEBKIT === 'yes') {
+        const browser = await webkit.launch();
+        try {
+            const page = await browser.newPage({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
+            await catalog(page);
+            await open(page, '/my-account/');
+            await noOverflow(page, '/my-account/', 390);
+            await page.screenshot({path:samples + '/webkit-account-390.png', fullPage:true});
+        } finally {
+            await browser.close();
+        }
+    }
+}
+
 (async () => {
+    await checkWebkit();
     const browser = await chromium.launch();
     try {
         const page = await browser.newPage();
@@ -303,6 +328,16 @@ async function resetPassword(page, email, password) {
                 const slug = new URL(path, origin).pathname.replaceAll('/', '-');
                 await page.screenshot({path:samples + '/' + slug + '390.png', fullPage:true});
             }
+        }
+        if (process.env.TOP_PARIKS_STORE004 === 'yes') {
+            await page.setViewportSize({width:320,height:844});
+            await open(page, '/shop/');
+            const title = page.locator('.woocommerce-loop-product__title').first();
+            await title.evaluate(element => { element.textContent = 'Демонстрационная модель парика с длинным названием '.repeat(4); });
+            assert.ok(await title.evaluate(element => element.scrollWidth <= element.clientWidth));
+            await noOverflow(page, '/shop/ long title', 320);
+            await open(page, '/?s=store004-no-such-item&post_type=product');
+            await page.locator('.atelier-search-help a').waitFor();
         }
         await open(page, '/topqa-missing-page/', 404);
         await open(page, '/shop/?filter_material=natural');
@@ -371,16 +406,4 @@ async function resetPassword(page, email, password) {
         await browser.close();
     }
 
-    if (process.env.TOP_PARIKS_TEST_WEBKIT === 'yes') {
-        const browser = await webkit.launch();
-        try {
-            const page = await browser.newPage({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
-            await catalog(page);
-            await open(page, '/my-account/');
-            await noOverflow(page, '/my-account/', 390);
-            await page.screenshot({path:samples + '/webkit-account-390.png', fullPage:true});
-        } finally {
-            await browser.close();
-        }
-    }
 })().catch(error => { console.error(error); process.exitCode = 1; });
