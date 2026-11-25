@@ -4,6 +4,10 @@ defined('ABSPATH') || exit;
 // This isolated store must be accessible to guests.
 update_option('woocommerce_coming_soon', 'no');
 
+// Rebuild routes after WooCommerce has registered the catalog and its pages.
+$GLOBALS['wp_rewrite']->set_permalink_structure('/%postname%/');
+flush_rewrite_rules(false);
+
 foreach ([
     'material' => ['Материал', ['Натуральные волосы', 'Искусственное волокно']],
     'length' => ['Длина', ['Длинные', 'Короткие']],
