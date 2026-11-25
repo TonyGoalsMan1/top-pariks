@@ -464,6 +464,7 @@ body.home .header-actions .cart-link { background: #efe1d5; }
 @media (max-width: 680px) {
     .atelier-home .hero-inner, .atelier-benefits { grid-template-columns: minmax(0, 1fr); }
     .atelier-home .hero-media { min-height: clamp(210px, 63vw, 390px); }
+    .atelier-home .hero-image { inset-inline-start: -4%; width: 104%; }
     .atelier-home .hero-copy { order: 1; }
 }
 @media (max-width: 420px) {
