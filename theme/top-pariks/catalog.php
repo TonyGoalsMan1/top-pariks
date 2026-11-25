@@ -47,10 +47,10 @@ function tp_catalog_filters() {
                 <select name="<?php echo esc_attr($name); ?>">
                     <option value="">Все варианты</option>
                     <?php if (count($active) > 1) : ?>
-                        <option value="<?php echo esc_attr(implode(',', $active)); ?>" selected>Выбрано: <?php echo count($active); ?></option>
+                        <option value="<?php echo esc_attr(implode(',', array_map('rawurldecode', $active))); ?>" selected>Выбрано: <?php echo count($active); ?></option>
                     <?php endif; ?>
                     <?php foreach ($terms as $term) : ?>
-                        <option value="<?php echo esc_attr($term->slug); ?>"<?php selected($active === [$term->slug]); ?>><?php echo esc_html($term->name); ?></option>
+                        <option value="<?php echo esc_attr(rawurldecode($term->slug)); ?>"<?php selected($active === [$term->slug]); ?>><?php echo esc_html($term->name); ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
