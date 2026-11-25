@@ -155,6 +155,7 @@ async function account(page, email, password) {
     await page.locator('#account_first_name').fill('Анна');
     await page.locator('#account_last_name').fill('Тестова');
     await page.locator('#account_display_name').fill('Анна Тестова');
+    await page.locator('#account_email').fill('updated-' + email);
     await page.locator('#password_current').fill(password);
     await page.locator('#password_1').pressSequentially(password + '9!');
     await page.locator('#password_2').fill(password + '9!');
@@ -185,9 +186,19 @@ async function resetPassword(page, email, password) {
     const encoded = wp('eval', "echo wp_json_encode(get_transient('topqa_mail_' . hash('sha256', '" + email + "')));");
     const message = JSON.parse(encoded);
     assert.match(message.subject, /[А-Яа-я]/);
-    const link = message.message.match(/https?:\/\/[^\s<>]+[?&]key=[^\s<>]+/);
+    const link = await page.evaluate(message => {
+        const document = new DOMParser().parseFromString(message, 'text/html');
+        const links = [...document.querySelectorAll('a[href]')].map(anchor => anchor.href);
+        links.push(...(document.body.textContent.match(/https?:\/\/[^\s<>]+/g) || []));
+        return links.find(href => {
+            const url = new URL(href, location.href);
+            return url.origin === location.origin && url.searchParams.has('key')
+                && (url.searchParams.has('id') || url.searchParams.has('login'));
+        });
+    }, message.message);
     assert.ok(link, 'Password reset URL was captured');
-    await open(page, link[0].replaceAll('&amp;', '&'));
+    await open(page, link);
+    assert.equal(new URL(page.url()).searchParams.get('show-reset-form'), 'true');
     await page.locator('#password_1').pressSequentially(password);
     await page.locator('#password_2').fill(password);
     await page.locator('form.lost_reset_password button[type=submit]').click();
@@ -238,20 +249,22 @@ async function resetPassword(page, email, password) {
         const guestOrder = await checkout(guest, 'guest-' + email, true);
         const customer = await browser.newPage({ viewport: {width: 390, height: 844} });
         await account(customer, email, password);
-        const customerOrder = await checkout(customer, email);
+        const updatedEmail = 'updated-' + email;
+        const customerOrder = await checkout(customer, updatedEmail);
         await open(customer, '/my-account/orders/');
         await noOverflow(customer, '/my-account/orders/', 390);
         await customer.screenshot({path:samples + '/orders-390.png', fullPage:true});
         assert.match(await customer.locator('main').innerText(), new RegExp(String(customerOrder)));
         await open(customer, '/my-account/view-order/' + customerOrder + '/');
         assert.match(await customer.locator('main').innerText(), /Atelier/);
+        assert.match(await customer.locator('mark.order-status').innerText(), /[А-Яа-яЁё]/);
         await open(customer, '/my-account/view-order/' + guestOrder + '/');
         assert.equal(await customer.locator('.woocommerce-order-details').count(), 0);
         await customer.locator('.woocommerce-MyAccount-navigation-link--customer-logout a').click();
         await customer.locator('#username').waitFor();
-        await login(customer, email, password + '9!');
+        await login(customer, updatedEmail, password + '9!');
         await customer.locator('.woocommerce-MyAccount-navigation-link--customer-logout a').click();
-        await resetPassword(customer, email, password + '8!');
+        await resetPassword(customer, updatedEmail, password + '8!');
 
         const adminPassword = 'TopQa!Z9-' + randomBytes(20).toString('hex');
         wp('user', 'update', 'topqa', '--user_pass=' + adminPassword);
