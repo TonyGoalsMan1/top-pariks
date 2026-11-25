@@ -1,5 +1,6 @@
 <?php get_header(); ?>
-<div class="wrap page-content">
+<div class="wrap page-content atelier-commerce">
+    <?php woocommerce_breadcrumb(); ?>
     <?php
     if (is_shop() || is_product_category() || is_product_tag() || is_search()) :
         $categories = get_terms(['taxonomy' => 'product_cat', 'parent' => 0, 'hide_empty' => true]);
@@ -28,6 +29,9 @@
     if ($custom_empty_state) {
         remove_action('woocommerce_no_products_found', 'wc_no_products_found');
         add_action('woocommerce_no_products_found', $render_empty_state);
+    }
+    if (!is_product()) {
+        add_action('woocommerce_archive_description', 'tp_catalog_filters', 30);
     }
     woocommerce_content();
     if ($custom_empty_state) {

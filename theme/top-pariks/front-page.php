@@ -81,6 +81,7 @@ foreach ($categories as $slug => [$image, $label]) {
                         <div class="product-body">
                             <h3><a href="<?php echo esc_url($url); ?>"><?php echo esc_html($product->get_name()); ?></a></h3>
                             <div class="price"><?php echo wp_kses_post($product->get_price_html()); ?></div>
+                            <?php tp_product_details_preview($product); ?>
                             <a class="btn" href="<?php echo esc_url($url); ?>">Подробнее</a>
                         </div>
                     </article>
