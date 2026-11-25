@@ -102,3 +102,8 @@ function tp_loop_product_details_preview() {
     }
 }
 add_action('woocommerce_after_shop_loop_item_title', 'tp_loop_product_details_preview', 12);
+
+function tp_keep_filtered_search_results($redirect) {
+    return tp_has_catalog_parameters() ? false : $redirect;
+}
+add_filter('woocommerce_redirect_single_search_result', 'tp_keep_filtered_search_results');
