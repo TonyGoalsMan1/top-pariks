@@ -202,8 +202,11 @@ async function resetPassword(page, email, password) {
     await page.locator('#password_1').pressSequentially(password);
     await page.locator('#password_2').fill(password);
     await page.locator('form.lost_reset_password button[type=submit]').click();
-    await page.locator('#username').waitFor();
+    await page.waitForURL(url => url.searchParams.get('password-reset') === 'true');
+    await page.locator('.woocommerce-MyAccount-navigation').waitFor();
+    await page.locator('.woocommerce-MyAccount-navigation-link--customer-logout a').click();
     await login(page, email, password);
+    console.log('Password reset by intercepted email and fresh login passed.');
 }
 
 (async () => {
