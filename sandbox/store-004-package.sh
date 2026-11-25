@@ -21,7 +21,8 @@ cp sandbox/store-004-restore.sh "$output/restore.sh"
 cp sandbox/STORE-004-portability.md "$output/README.md"
 if [[ "${TOP_PARIKS_STORE005:-}" == yes ]]; then
     cp docs/STORE-005-admin.md "$output/ADMIN-RU.md"
-    extra+=(ADMIN-RU.md)
+    cp docs/STORE-005-catalog-import.md docs/store-005-catalog-template.csv "$output/"
+    extra+=(ADMIN-RU.md STORE-005-catalog-import.md store-005-catalog-template.csv)
 fi
 printf '%s\n' "$TOP_PARIKS_URL" > "$output/source-url.txt"
 (cd "$output" && sha256sum site-files.tar.gz site.sql wp-cli.phar compose.yaml restore.sh source-url.txt README.md "${extra[@]}" > SHA256SUMS)

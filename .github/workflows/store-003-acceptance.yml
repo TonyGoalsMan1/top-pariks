@@ -74,6 +74,15 @@ jobs:
               }
               WP_CLI::success("Independent restore verified: database, image file, variations, locale and new URL.");
             '
+            if [[ "$TOP_PARIKS_STORE005" == yes ]]; then
+              "${dc[@]}" exec -T --user www-data wordpress php /tmp/atelier-wp-cli.phar --url=http://localhost:8086 eval '
+                if (get_option("blog_public") !== "0") { WP_CLI::error("Restored copy permits indexing"); }
+                foreach (get_users() as $user) {
+                  if ($user->user_pass !== "*") { WP_CLI::error("Restored account password was not disabled"); }
+                }
+                WP_CLI::success("Restored demo blocks indexing and contains no usable account passwords.");
+              '
+            fi
           )
           echo 'TOP_PARIKS_STORE004=yes' >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
@@ -108,6 +117,11 @@ jobs:
           path: store-003-screenshots/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Import and update synthetic products by SKU
+        if: github.ref_name == 'store-005/launch-prep'
+        run: |
+          docker compose cp docs/store-005-catalog-template.csv wordpress:/tmp/store-005-catalog-template.csv
+          docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" eval-file - < sandbox/store-005-import.php
       - name: Repeat Lighthouse lab runs
         if: github.ref_name == 'store-005/launch-prep'
         run: bash sandbox/store-005-lighthouse.sh
