@@ -19,7 +19,11 @@ const origin = new URL(process.env.TOP_PARIKS_URL || 'http://localhost:8080').or
         assert.ok(await page.locator('meta[property="og:image"]').getAttribute('content'));
         assert.equal(await page.locator('link[rel=canonical]').count(), 1);
         await open('/shop/?filter_material=natural&atelier_filters=1&utm_source=test');
-        assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), origin + '/shop/');
+        const filteredCanonical = new URL(await page.locator('link[rel=canonical]').getAttribute('href'));
+        assert.equal(filteredCanonical.pathname, '/shop/');
+        assert.equal(filteredCanonical.searchParams.get('filter_material'), 'natural');
+        assert.equal(filteredCanonical.searchParams.has('utm_source'), false);
+        assert.equal(filteredCanonical.searchParams.has('atelier_filters'), false);
         await open('/product-category/natural-wigs/');
         assert.equal(await page.locator('meta[property="og:type"]').getAttribute('content'), 'website');
         await open('/product/topqa-natural/');

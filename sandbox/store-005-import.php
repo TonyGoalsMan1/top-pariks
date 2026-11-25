@@ -6,6 +6,7 @@ if (!defined('WP_CLI') || 'local' !== wp_get_environment_type() || '0' !== get_o
 }
 
 require_once ABSPATH . 'wp-admin/includes/file.php';
+require_once ABSPATH . 'wp-admin/includes/class-wp-importer.php';
 require_once WC_ABSPATH . 'includes/import/abstract-wc-product-importer.php';
 require_once WC_ABSPATH . 'includes/import/class-wc-product-csv-importer.php';
 require_once WC_ABSPATH . 'includes/admin/importers/class-wc-product-csv-importer-controller.php';

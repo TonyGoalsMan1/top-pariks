@@ -19,7 +19,7 @@ function tp_catalog_canonical_url() {
 
     $remove = [];
     foreach (array_keys($_GET) as $key) {
-        if (preg_match('/^(?:utm_.+|gclid|fbclid|atelier_filters|add-to-cart|orderby|min_price|max_price|rating_filter|stock_status|(?:filter|query_type)_.+)$/D', (string) $key)) {
+        if (preg_match('/^(?:utm_.+|gclid|fbclid|atelier_filters|add-to-cart)$/D', (string) $key)) {
             $remove[] = $key;
         }
     }
@@ -29,6 +29,7 @@ function tp_catalog_canonical_url() {
 function tp_open_graph() {
     if (is_404() || is_search() || tp_is_service_page() || is_preview()
         || (is_singular() && post_password_required())
+        || (tp_catalog_canonical_url() && tp_has_catalog_parameters())
         || !apply_filters('tp_emit_open_graph', true)) {
         return;
     }
@@ -71,3 +72,11 @@ function tp_demo_robots_header($headers) {
     return $headers;
 }
 add_filter('wp_headers', 'tp_demo_robots_header');
+
+function tp_sitemap_catalog_terms($args, $taxonomy) {
+    if ('product_cat' === $taxonomy) {
+        $args['hide_empty'] = true;
+    }
+    return $args;
+}
+add_filter('wp_sitemaps_taxonomies_query_args', 'tp_sitemap_catalog_terms', 10, 2);
