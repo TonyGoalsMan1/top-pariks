@@ -47,7 +47,9 @@ foreach ($categories as $slug => [$image, $label]) {
             <div class="categories">
                 <?php foreach ($category_links as [$url, $image, $label]) : ?>
                     <a class="category" href="<?php echo esc_url($url); ?>">
-                        <img loading="lazy" src="<?php echo tp_image($image); ?>" alt="">
+                        <div class="atelier-category-image">
+                            <img loading="lazy" src="<?php echo tp_image($image); ?>" alt="">
+                        </div>
                         <span><?php echo esc_html($label); ?></span>
                     </a>
                 <?php endforeach; ?>

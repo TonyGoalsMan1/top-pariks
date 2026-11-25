@@ -445,7 +445,8 @@ body.home .header-actions .cart-link { background: #efe1d5; }
 .atelier-home .section + .section { padding-top: 0; }
 .atelier-home .section-head { margin-bottom: 18px; }
 .atelier-home .category { background: #fffaf4; border-radius: 12px; }
-.atelier-home .category img { aspect-ratio: 5 / 4; }
+.atelier-category-image { aspect-ratio: 5 / 4; overflow: hidden; }
+.atelier-category-image img { height: 145%; aspect-ratio: auto; }
 .atelier-home .category span { padding-block: 13px; }
 .atelier-home .product .btn { align-self: flex-start; }
 .atelier-benefits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
