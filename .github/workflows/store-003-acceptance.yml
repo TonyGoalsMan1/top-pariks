@@ -95,7 +95,7 @@ jobs:
         if: github.ref_name == 'store-005/launch-prep'
         run: |
           docker compose cp docs/store-005-catalog-template.csv wordpress:/tmp/store-005-catalog-template.csv
-          docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" eval-file - < sandbox/store-005-import.php
+          docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" --user=topqa eval-file - < sandbox/store-005-import.php
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

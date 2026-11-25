@@ -1,7 +1,8 @@
 <?php
 defined('ABSPATH') || exit;
 
-if (!defined('WP_CLI') || 'local' !== wp_get_environment_type() || '0' !== get_option('blog_public')) {
+if (!defined('WP_CLI') || 'local' !== wp_get_environment_type() || '0' !== get_option('blog_public')
+    || !current_user_can('manage_product_terms')) {
     throw new RuntimeException('Use the STORE-005 synthetic test store.');
 }
 
