@@ -20,7 +20,7 @@
       "step": "installTheme",
       "themeData": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/design/design-002/top-pariks.zip"
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/cd8c2b4dd69630d22cbf212682b50b62362bfd7e/top-pariks.zip"
       },
       "options": {
         "activate": true
