@@ -26,7 +26,7 @@ foreach ($categories as $slug => [$image, $label]) {
                 <h1 id="atelier-title">Парики для вашего образа</h1>
                 <p>Натуральные и искусственные модели. Выберите длину, оттенок и укладку, которые вам подходят.</p>
                 <div class="atelier-actions">
-                    <a class="btn" href="<?php echo esc_url($catalog_url); ?>">Открыть каталог</a>
+                    <a class="btn" href="<?php echo esc_url($catalog_url); ?>">Перейти в каталог</a>
                     <?php if ($category_links) : ?>
                         <a class="atelier-link" href="#atelier-categories">Выбрать категорию</a>
                     <?php endif; ?>
