@@ -84,9 +84,9 @@ function tp_fallback_menu() {
     }
 }
 
-function tp_meta_description() {
+function tp_storefront_description() {
     if (is_404() || is_search() || tp_is_service_page() || (is_singular() && post_password_required(get_queried_object()))) {
-        return;
+        return '';
     }
 
     $description = '';
@@ -98,7 +98,12 @@ function tp_meta_description() {
     } elseif (is_singular() || (function_exists('is_shop') && is_shop() && !is_paged() && !tp_has_catalog_parameters())) {
         $post = is_singular() ? get_queried_object() : get_post(wc_get_page_id('shop'));
         if ($post instanceof WP_Post && 'publish' === $post->post_status && '' === $post->post_password) {
-            $description = $post->post_excerpt;
+            if ('product' === $post->post_type) {
+                $description = (string) get_post_meta($post->ID, 'atelier_seo_description', true);
+            }
+            if ('' === trim($description)) {
+                $description = $post->post_excerpt;
+            }
             if ('' === trim($description)) {
                 $description = wp_trim_words(strip_shortcodes(str_replace(['</p>', '</li>'], ' ', $post->post_content)), 30, '…');
             }
@@ -109,6 +114,11 @@ function tp_meta_description() {
 
     $description = wp_strip_all_tags(strip_shortcodes($description), true);
     $description = trim(preg_replace('/\s+/u', ' ', $description) ?? $description);
+    return $description;
+}
+
+function tp_meta_description() {
+    $description = tp_storefront_description();
     if ('' !== $description && apply_filters('tp_emit_meta_description', true)) {
         printf("<meta name=\"description\" content=\"%s\" />\n", esc_attr($description));
     }
@@ -130,12 +140,11 @@ function tp_archive_canonical() {
     }
     if (is_front_page() && !is_singular() && !is_paged()) {
         $url = home_url('/');
-    } elseif (function_exists('is_shop') && !is_search() && (is_shop() || is_product_taxonomy())) {
-        $url = get_pagenum_link(max(1, (int) get_query_var('paged')), false);
-        $tracking = array_intersect_key($_GET, array_flip(['utm_source', 'utm_medium', 'utm_campaign', 'utm_id', 'utm_term', 'utm_content', 'gclid', 'fbclid']));
-        $url = remove_query_arg(array_keys($tracking), $url);
     } else {
-        return;
+        $url = tp_catalog_canonical_url();
+        if ($url === '') {
+            return;
+        }
     }
 
     printf("<link rel=\"canonical\" href=\"%s\" />\n", esc_url($url));
@@ -199,6 +208,7 @@ function tp_sitemap_post_query_args($args, $post_type) {
 add_filter('wp_sitemaps_posts_query_args', 'tp_sitemap_post_query_args', 10, 2);
 
 require_once __DIR__ . '/storefront-setup.php';
+require_once __DIR__ . '/storefront-seo.php';
 
 function tp_normalize_catalog_filters() {
     if (!isset($_GET['atelier_filters'])) {

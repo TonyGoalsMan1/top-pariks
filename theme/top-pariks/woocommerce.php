@@ -10,6 +10,13 @@ get_header();
 ?>
 <div class="wrap page-content">
     <?php
+    if (!is_search() && !is_shop() && (is_product() || is_product_taxonomy())) {
+        woocommerce_breadcrumb([
+            'home' => __('Главная', 'top-pariks'),
+            'wrap_before' => '<nav class="woocommerce-breadcrumb" aria-label="' . esc_attr__('Хлебные крошки', 'top-pariks') . '">',
+        ]);
+    }
+
     if (is_shop() || is_product_category() || is_product_tag() || is_search()) :
         $categories = get_terms(['taxonomy' => 'product_cat', 'parent' => 0, 'hide_empty' => true]);
         if (!is_wp_error($categories) && $categories) :

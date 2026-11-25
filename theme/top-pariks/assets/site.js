@@ -53,6 +53,13 @@ if (filterToggle && filters) {
         setFilters(!compact.matches || focusInside);
     };
     filterToggle.addEventListener('click', () => setFilters(filters.hidden));
+    filters.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !event.defaultPrevented && compact.matches && !filters.hidden) {
+            event.preventDefault();
+            setFilters(false);
+            filterToggle.focus();
+        }
+    });
     compact.addEventListener('change', syncFilters);
     syncFilters();
 }

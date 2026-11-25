@@ -112,7 +112,7 @@ jobs:
           fi
       - name: Technical SEO audit
         if: github.ref_name == 'store-005/launch-prep'
-        run: if [ -f sandbox/store-005-seo.cjs ]; then node sandbox/store-005-seo.cjs; fi
+        run: node sandbox/store-005-seo.cjs
       - name: Buyer acceptance
         run: node sandbox/store-003-browser.cjs
       - uses: actions/upload-artifact@v4
