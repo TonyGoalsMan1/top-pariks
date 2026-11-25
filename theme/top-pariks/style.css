@@ -521,7 +521,8 @@ body { line-height: 1.6; }
 .woocommerce ul.products li.product .button { white-space: normal; }
 .woocommerce div.product .product_title { font: normal clamp(30px, 4vw, 50px)/1.12 var(--serif); overflow-wrap: anywhere; }
 .woocommerce div.product .summary .price { font-size: clamp(1.25rem, 2.6vw, 1.8rem); font-weight: 700; }
-.woocommerce div.product p.stock { font-weight: 650; }
+.woocommerce div.product p.stock { color: #34553f; font-weight: 650; }
+.woocommerce div.product p.stock.out-of-stock, .woocommerce div.product p.stock.available-on-backorder { color: #79363a; }
 .woocommerce div.product .woocommerce-product-gallery__image img { border-radius: 10px; }
 .woocommerce div.product .woocommerce-product-gallery .flex-control-thumbs { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 12px; }
 .woocommerce div.product .woocommerce-product-gallery .flex-control-thumbs li { width: clamp(52px, 10vw, 78px); float: none; }

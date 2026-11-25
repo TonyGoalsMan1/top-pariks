@@ -16,7 +16,7 @@
       "step": "installTheme",
       "themeData": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/store-004/demo/top-pariks.zip?v=atelier-130"
+        "url": "https://raw.githubusercontent.com/TonyGoalsMan1/top-pariks/store-004/demo/top-pariks.zip?v=atelier-130-contrast"
       },
       "options": {
         "activate": true
