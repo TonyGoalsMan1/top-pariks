@@ -135,16 +135,22 @@ async function account(page, email, password) {
         await usernameField.fill(email.split('@')[0]);
     }
     await registration.locator('#reg_email').fill(email);
-    await registration.locator('#reg_password').fill(password);
-    await registration.locator('[name=register]').click();
-    await page.locator('.woocommerce-MyAccount-navigation').waitFor();
+    const passwordInput = registration.locator('#reg_password');
+    await passwordInput.pressSequentially(password);
+    await passwordInput.press('Tab');
+    assert.deepEqual(await registration.locator(':invalid[name]').evaluateAll(fields => fields.map(field => field.name)), []);
+    await registration.locator('button[name=register]:enabled').click();
+    const navigation = page.locator('.woocommerce-MyAccount-navigation');
+    const notice = page.locator('.woocommerce-error');
+    await navigation.or(notice).first().waitFor();
+    assert.equal(await notice.count(), 0, await notice.allTextContents());
 
     await open(page, '/my-account/edit-account/');
     await page.locator('#account_first_name').fill('Анна');
     await page.locator('#account_last_name').fill('Тестова');
     await page.locator('#account_display_name').fill('Анна Тестова');
     await page.locator('#password_current').fill(password);
-    await page.locator('#password_1').fill(password + '9!');
+    await page.locator('#password_1').pressSequentially(password + '9!');
     await page.locator('#password_2').fill(password + '9!');
     await page.locator('[name=save_account_details]').click();
     await page.locator('.woocommerce-message').waitFor();
@@ -174,7 +180,7 @@ async function resetPassword(page, email, password) {
     const link = message.message.match(/https?:\/\/[^\s<>]+[?&]key=[^\s<>]+/);
     assert.ok(link, 'Password reset URL was captured');
     await open(page, link[0].replaceAll('&amp;', '&'));
-    await page.locator('#password_1').fill(password);
+    await page.locator('#password_1').pressSequentially(password);
     await page.locator('#password_2').fill(password);
     await page.locator('form.lost_reset_password button[type=submit]').click();
     await page.locator('#username').waitFor();
@@ -219,7 +225,7 @@ async function resetPassword(page, email, password) {
         assert.deepEqual(errors, []);
 
         const email = 'store003-' + randomBytes(5).toString('hex') + '@example.test';
-        const password = 'TopQa-' + randomBytes(20).toString('hex');
+        const password = 'TopQa!Z9-' + randomBytes(20).toString('hex');
         const guest = await browser.newPage();
         const guestOrder = await checkout(guest, 'guest-' + email, true);
         const customer = await browser.newPage({ viewport: {width: 390, height: 844} });
@@ -239,14 +245,14 @@ async function resetPassword(page, email, password) {
         await customer.locator('.woocommerce-MyAccount-navigation-link--customer-logout a').click();
         await resetPassword(customer, email, password + '8!');
 
-        const adminPassword = 'TopQa-' + randomBytes(20).toString('hex');
+        const adminPassword = 'TopQa!Z9-' + randomBytes(20).toString('hex');
         wp('user', 'update', 'topqa', '--user_pass=' + adminPassword);
         const admin = await browser.newPage();
         await login(admin, 'topqa', adminPassword);
         const orderUrl = wp('eval', 'echo wc_get_order(' + customerOrder + ')->get_edit_order_url();');
         await open(admin, orderUrl);
         await admin.locator('#order_status').selectOption('wc-completed');
-        await admin.locator('button.save_order').click();
+        await Promise.all([admin.waitForEvent('framenavigated'), admin.locator('button.save_order').click()]);
         await admin.waitForLoadState();
         assert.equal(wp('eval', 'echo wc_get_order(' + customerOrder + ')->get_status();'), 'completed');
         assert.equal(wp('eval', 'echo wc_get_order(' + guestOrder + ')->get_customer_id();'), '0');
