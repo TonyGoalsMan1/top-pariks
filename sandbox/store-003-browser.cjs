@@ -186,6 +186,44 @@ async function account(page, email, password) {
     await page.locator('.woocommerce-message').waitFor();
 }
 
+async function verifyStore004Admin(admin) {
+    const natural = wp('eval', "echo wc_get_product_id_by_sku('TOPQA-NATURAL');");
+    await open(admin, '/wp-admin/post.php?post=' + natural + '&action=edit');
+    await admin.locator('#_regular_price').fill('22');
+    await admin.locator('.inventory_tab a').click();
+    await admin.locator('#_stock').fill('45');
+    await Promise.all([admin.waitForEvent('framenavigated'), admin.locator('#publish').click()]);
+    assert.deepEqual(JSON.parse(wp('eval', "$p=wc_get_product(" + natural + ");echo wp_json_encode([(float)$p->get_regular_price(),$p->get_stock_quantity()]);")), [22, 45]);
+
+    const parent = wp('eval', "echo wc_get_product_id_by_sku('TOPQA-CHOICE');");
+    const variant = wp('eval', "echo wc_get_product_id_by_sku('TOPQA-CHOICE-CHESTNUT');");
+    await open(admin, '/wp-admin/post.php?post=' + parent + '&action=edit');
+    await admin.locator('.variations_tab a').click();
+    const panel = admin.locator('.woocommerce_variation').filter({has: admin.locator('.variable_post_id[value="' + variant + '"]')});
+    await panel.locator('.edit_variation').click();
+    const variantPrice = panel.locator('input[name^=variable_regular_price]');
+    await variantPrice.fill('29');
+    await variantPrice.press('Tab');
+    const saved = admin.waitForResponse(response => (response.request().postData() || '').includes('action=woocommerce_save_variations'));
+    await admin.locator('.save-variation-changes').click();
+    assert.equal((await saved).ok(), true);
+    assert.equal(Number(wp('eval', 'echo wc_get_product(' + variant + ')->get_regular_price();')), 29);
+
+    await open(admin, '/wp-admin/media-new.php?browser-uploader');
+    await admin.locator('#async-upload').setInputFiles('theme/top-pariks/assets/images/product-4.webp');
+    await admin.locator('#html-upload').click();
+    await admin.waitForURL(/upload\.php/);
+    assert.ok(wp('post', 'list', '--post_type=attachment', '--post_status=inherit', '--name=product-4', '--field=ID'));
+
+    await open(admin, '/wp-admin/edit-tags.php?taxonomy=product_cat&post_type=product');
+    await admin.locator('#tag-name').fill('ТЕСТ — категория администратора');
+    await admin.locator('#tag-slug').fill('store004-admin-category');
+    await admin.locator('#submit').click();
+    await admin.locator('#the-list').getByText('ТЕСТ — категория администратора', {exact:true}).waitFor();
+    assert.ok(wp('term', 'list', 'product_cat', '--slug=store004-admin-category', '--field=term_id'));
+    console.log('STORE-004: product price, stock, variation, media upload and category creation passed in wp-admin.');
+}
+
 async function login(page, username, password) {
     await open(page, '/my-account/');
     await page.locator('#username').fill(username);
@@ -326,6 +364,9 @@ async function resetPassword(page, email, password) {
         await admin.waitForLoadState();
         assert.ok(wp('post', 'list', '--post_type=product', '--post_status=draft', '--s=правка черновика', '--field=ID'));
         console.log('Guest and customer orders, account isolation, password reset, status and product administration passed.');
+        if (process.env.TOP_PARIKS_STORE004 === 'yes') {
+            await verifyStore004Admin(admin);
+        }
     } finally {
         await browser.close();
     }

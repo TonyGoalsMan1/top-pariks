@@ -34,8 +34,12 @@ foreach ($pages as $slug => [$title, $intro, $sections]) {
         if (get_post_meta($existing->ID, '_top_pariks_store004_outline', true)) {
             continue;
         }
-        // Keep the original demonstration text and append the editable outline.
-        $content = $existing->post_content . "\n\n" . $outline($intro, $sections);
+        // Replace only the known generated seed claim. Preserve custom content.
+        $previous = $existing->post_content;
+        if ('delivery' === $slug && 'Мы доставляем заказы по России. Доступные способы доставки и оплаты отображаются при оформлении заказа.' === $previous) {
+            $previous = '';
+        }
+        $content = trim($previous . "\n\n" . $outline($intro, $sections));
         $id = wp_update_post(['ID' => $existing->ID, 'post_content' => $content], true);
     } elseif (!$existing) {
         $id = wp_insert_post(['post_type' => 'page', 'post_status' => 'publish', 'post_name' => $slug,
