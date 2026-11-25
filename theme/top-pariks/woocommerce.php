@@ -21,6 +21,29 @@
             <?php
         endif;
     endif;
+    if (is_product_category()) :
+        $children = get_terms([
+            'taxonomy' => 'product_cat',
+            'parent' => get_queried_object_id(),
+            'hide_empty' => true,
+        ]);
+        if (!is_wp_error($children) && $children) :
+            ?>
+            <nav class="catalog-nav" aria-label="<?php esc_attr_e('Подкатегории товаров', 'top-pariks'); ?>">
+                <ul>
+                    <?php foreach ($children as $child) :
+                        $child_url = get_term_link($child);
+                        if (is_wp_error($child_url)) {
+                            continue;
+                        }
+                        ?>
+                        <li><a href="<?php echo esc_url($child_url); ?>"><?php echo esc_html($child->name); ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </nav>
+            <?php
+        endif;
+    endif;
     if (!is_search() && (is_shop() || is_product_taxonomy())) {
         get_template_part('catalog-filters');
     }

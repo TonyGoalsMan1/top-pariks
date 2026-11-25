@@ -208,6 +208,9 @@ async function resetPassword(page, email, password) {
             '/product-category/natural-wigs/', '/product-category/synthetic-wigs/', '/product-category/short-wigs/', '/product-category/long-wigs/']) {
             await open(page, path);
         }
+        await open(page, '/product-category/short-wigs/');
+        await page.getByRole('navigation', {name:'Подкатегории товаров'}).getByRole('link', {name:/пикси/i}).click();
+        assert.match(await page.locator('ul.products').innerText(), /выбором цвета/);
         const privacyUrl = await page.locator('footer a').filter({hasText:'Политика конфиденциальности'}).getAttribute('href');
         await open(page, privacyUrl);
         await open(page, '/topqa-missing-page/', 404);

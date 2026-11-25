@@ -96,7 +96,14 @@ $variable->set_slug('topqa-choice');
 $variable->set_status('publish');
 $variable->set_short_description('Синтетические данные для проверки выбора цвета и остатков.');
 $variable->set_attributes($build_attributes('synthetic', 'short', ['chestnut', 'blond'], true));
-$variable->set_category_ids(wc_get_product(wc_get_product_id_by_sku('TOPQA-SYNTHETIC'))->get_category_ids());
+$studio_categories = wc_get_product(wc_get_product_id_by_sku('TOPQA-SYNTHETIC'))->get_category_ids();
+$short = get_term_by('slug', 'short-wigs', 'product_cat');
+$child = term_exists('pixie-test', 'product_cat', $short->term_id)
+    ?: wp_insert_term('ТЕСТ — пикси', 'product_cat', ['slug' => 'pixie-test', 'parent' => $short->term_id]);
+if (is_wp_error($child)) {
+    throw new RuntimeException($child->get_error_message());
+}
+$variable->set_category_ids(array_merge($studio_categories, [(int) $child['term_id']]));
 $variable->set_image_id($get_fixture_image('product-3'));
 $variable->save();
 
