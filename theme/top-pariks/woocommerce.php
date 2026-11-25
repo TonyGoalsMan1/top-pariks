@@ -21,6 +21,9 @@
             <?php
         endif;
     endif;
+    if (!is_search() && (is_shop() || is_product_taxonomy())) {
+        get_template_part('catalog-filters');
+    }
     $custom_empty_state = is_shop() && !is_search() && !is_paged() && !tp_has_catalog_parameters();
     $render_empty_state = static function () {
         echo '<p class="notice">В каталоге пока нет товаров. Загляните позже, чтобы посмотреть новые модели TOP-PARIKS.</p>';

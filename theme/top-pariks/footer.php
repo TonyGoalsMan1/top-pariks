@@ -8,6 +8,9 @@
             </div>
             <nav aria-label="Навигация в подвале">
                 <?php tp_fallback_menu(); ?>
+                <?php if ($returns_url = tp_published_page_url('returns')) : ?>
+                    <a href="<?php echo esc_url($returns_url); ?>"><?php esc_html_e('Возврат', 'top-pariks'); ?></a>
+                <?php endif; ?>
                 <?php if ($privacy_url = get_privacy_policy_url()) : ?>
                     <a href="<?php echo esc_url($privacy_url); ?>">Политика конфиденциальности</a>
                 <?php endif; ?>

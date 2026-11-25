@@ -199,3 +199,16 @@ function tp_sitemap_post_query_args($args, $post_type) {
 add_filter('wp_sitemaps_posts_query_args', 'tp_sitemap_post_query_args', 10, 2);
 
 require_once __DIR__ . '/storefront-setup.php';
+
+function tp_normalize_catalog_filters() {
+    if (!isset($_GET['atelier_filters'])) {
+        return;
+    }
+
+    foreach (['filter_material', 'filter_length', 'filter_color', 'min_price', 'max_price'] as $key) {
+        if (isset($_GET[$key]) && (!is_string($_GET[$key]) || '' === trim($_GET[$key]))) {
+            unset($_GET[$key]);
+        }
+    }
+}
+add_action('parse_request', 'tp_normalize_catalog_filters', 1);

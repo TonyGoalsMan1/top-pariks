@@ -1,0 +1,64 @@
+name: STORE-003 acceptance
+
+on:
+  push:
+    branches: [p0/store-003-acceptance]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  buyer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      COMPOSE_PROJECT_NAME: top-pariks-store003
+      TOP_PARIKS_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Start isolated WooCommerce
+        run: ./sandbox/start.sh
+      - name: Install official Russian translations and test fixtures
+        run: |
+          set -euo pipefail
+          lang="$RUNNER_TEMP/locales"
+          mkdir -p "$lang/plugins"
+          curl -fsSL --max-time 60 https://downloads.wordpress.org/translation/core/6.9.1/ru_RU.zip -o "$RUNNER_TEMP/wordpress-ru.zip"
+          curl -fsSL --max-time 60 https://downloads.wordpress.org/translation/plugin/woocommerce/10.5.3/ru_RU.zip -o "$RUNNER_TEMP/woocommerce-ru.zip"
+          unzip -oq "$RUNNER_TEMP/wordpress-ru.zip" -d "$lang"
+          unzip -oq "$RUNNER_TEMP/woocommerce-ru.zip" -d "$lang/plugins"
+          docker compose exec -T wordpress mkdir -p /var/www/html/wp-content/languages
+          docker compose cp "$lang/." wordpress:/var/www/html/wp-content/languages/
+          docker compose cp sandbox/store-003-mail.php wordpress:/var/www/html/wp-content/mu-plugins/store-003-mail.php
+          wp() { docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" "$@"; }
+          wp config set TOP_PARIKS_STORE003_CAPTURE true --raw
+          wp option update WPLANG ru_RU
+          wp eval '$result = tp_provision_storefront(); if (is_wp_error($result)) { WP_CLI::error($result->get_error_message()); }'
+          wp eval-file - < sandbox/store-003-fixtures.php
+          wp eval 'printf("WordPress %s, WooCommerce %s, locale %s\n", get_bloginfo("version"), WC_VERSION, get_locale()); foreach (["shop", "cart", "checkout", "myaccount"] as $page) { if (wc_get_page_id($page) < 1) { WP_CLI::error($page); } }'
+          wp plugin list --status=must-use
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser engines
+        run: |
+          npm install --no-save --package-lock=false playwright-core@1.56.1
+          npx playwright-core install --with-deps chromium
+          if npx playwright-core install --with-deps webkit; then
+            echo 'TOP_PARIKS_TEST_WEBKIT=yes' >> "$GITHUB_ENV"
+          fi
+      - name: Buyer acceptance
+        run: node sandbox/store-003-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: store-003-screenshots
+          path: store-003-screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Stop isolated containers
+        if: always()
+        run: docker compose down --volumes

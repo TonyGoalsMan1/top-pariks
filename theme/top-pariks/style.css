@@ -3,7 +3,7 @@ Theme Name: TOP-PARIKS Atelier
 Theme URI: https://example.com/top-pariks-atelier
 Author: TOP-PARIKS Development
 Description: Responsive boutique storefront with WooCommerce-ready product listings. Demo images are cropped from the supplied design reference and should be replaced before production.
-Version: 1.2.0
+Version: 1.2.1
 Requires at least: 6.2
 Requires PHP: 7.4
 Text Domain: top-pariks
@@ -473,3 +473,26 @@ body.home .header-actions .cart-link { background: #efe1d5; }
     body.home .header-actions { justify-content: flex-start; max-width: 100%; flex-wrap: wrap; }
     .atelier-home .category span { font-size: .875rem; }
 }
+.atelier-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    gap: .75rem;
+    margin-block: 0 1.25rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: .75rem;
+    background: #fffaf4;
+}
+.atelier-filters label { display: grid; gap: .25rem; min-width: 0; font-weight: 600; }
+.atelier-filters input, .atelier-filters select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: .35rem .5rem;
+    border: 1px solid var(--line);
+    border-radius: .4rem;
+    background: #fff;
+    color: var(--ink);
+}
+.atelier-filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; align-self: end; }
+.atelier-filter-actions a { text-decoration: underline; text-underline-offset: .2em; }
