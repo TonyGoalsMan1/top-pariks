@@ -219,7 +219,7 @@ async function verifyStore004Admin(admin) {
     await admin.locator('#tag-name').fill('ТЕСТ — категория администратора');
     await admin.locator('#tag-slug').fill('store004-admin-category');
     await admin.locator('#submit').click();
-    await admin.locator('#the-list').getByRole('link', {name:'ТЕСТ — категория администратора', exact:true}).waitFor();
+    await admin.locator('#the-list .row-title').filter({hasText:'ТЕСТ — категория администратора'}).waitFor();
     assert.ok(wp('term', 'list', 'product_cat', '--slug=store004-admin-category', '--field=term_id'));
     await open(admin, '/wp-admin/edit.php?post_type=page');
     const faq = admin.locator('tr').filter({has: admin.locator('a.row-title').filter({hasText:'Часто задаваемые вопросы'})});
