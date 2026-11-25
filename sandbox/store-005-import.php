@@ -8,6 +8,7 @@ if (!defined('WP_CLI') || 'local' !== wp_get_environment_type() || '0' !== get_o
 require_once ABSPATH . 'wp-admin/includes/file.php';
 require_once WC_ABSPATH . 'includes/import/abstract-wc-product-importer.php';
 require_once WC_ABSPATH . 'includes/import/class-wc-product-csv-importer.php';
+require_once WC_ABSPATH . 'includes/admin/importers/class-wc-product-csv-importer-controller.php';
 
 $source = '/tmp/store-005-catalog-template.csv';
 $template = file_get_contents($source);
@@ -51,10 +52,11 @@ $ids_for = static function () use ($codes) {
 };
 $check(!array_filter($ids_for()), 'Start the import test with unused synthetic SKUs.');
 
-$file = wp_tempnam('atelier-store005.csv');
-if (!$file) {
+$upload = wp_upload_bits('store-005-import-test.csv', null, '');
+if (!empty($upload['error'])) {
     WP_CLI::error('Cannot create isolated CSV workspace.');
 }
+$file = $upload['file'];
 try {
     $import = static function ($input, $update) use ($file, $columns, $image_url, $check) {
         $check(false !== file_put_contents($file, str_replace('atelier-demo-photo.webp', $image_url, $input)), 'Cannot write test CSV.');
@@ -79,8 +81,13 @@ try {
     $simple = wc_get_product($ids[0]);
     $parent = wc_get_product($ids[1]);
     $variant = wc_get_product($ids[2]);
+    $unavailable = wc_get_product($ids[3]);
     $check($simple->is_type('simple') && $simple->get_status() === 'draft', 'Simple product was not imported as a draft.');
     $check($parent->is_type('variable') && count($parent->get_children()) === 2 && $variant->get_parent_id() === $ids[1], 'Variation links are invalid.');
+    $check($variant->get_attribute('pa_color') !== $unavailable->get_attribute('pa_color') &&
+        (float) $variant->get_regular_price() === 24.0 && $variant->is_in_stock() &&
+        (float) $unavailable->get_regular_price() === 26.0 && !$unavailable->is_in_stock(),
+        'Variation attribute, price or availability was lost.');
     $check($simple->get_image_id() === $image_id, 'Existing media attachment was not reused.');
     $check(count($simple->get_attributes()) === 5, 'Expected five CSV attributes.');
     $check((float) $simple->get_regular_price() === 19.0 && (int) $simple->get_stock_quantity() === 8, 'Price or stock did not import.');
