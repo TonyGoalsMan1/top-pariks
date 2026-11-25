@@ -52,7 +52,7 @@ async function catalog(page) {
     const select = page.locator('select[name=attribute_pa_color]');
     await select.selectOption('chestnut');
     await page.waitForFunction(() => Number(document.querySelector('input.variation_id').value) > 0);
-    assert.match(await page.locator('.single_variation').innerText(), /24[,.]00/);
+    await page.locator('.single_variation').filter({hasText:/24[,.]00/}).waitFor();
     if (!(await select.locator('option[value=blond]:disabled').count())) {
         await select.selectOption('blond');
         await page.locator('.single_add_to_cart_button.wc-variation-is-unavailable').waitFor();
@@ -71,6 +71,12 @@ async function addProduct(page) {
 const address = {first_name: 'Анна', last_name: 'Тестова', address_1: '123 Test Street',
     city: 'San Francisco', postcode: '94105', phone: '+14155550100'};
 async function fillAddress(page, prefix, email) {
+    for (const [field, value] of [['country', 'US'], ['state', 'CA']]) {
+        const select = page.locator('#' + prefix + '_' + field + ' option[value=' + value + ']');
+        if (await select.count()) {
+            await page.locator('#' + prefix + '_' + field).selectOption(value);
+        }
+    }
     for (const [field, value] of Object.entries(address)) {
         const input = page.locator('#' + prefix + '_' + field);
         if (await input.count()) {
@@ -86,6 +92,7 @@ async function checkout(page, email, validate = false) {
     await addProduct(page);
     if (validate) {
         await page.locator('.cart_item input.qty').fill('2');
+        await page.locator('.cart_item input.qty').press('Tab');
         await page.locator('[name=update_cart]').click();
         await page.waitForFunction(() => /38[.,]00/.test(document.querySelector('.order-total')?.textContent || ''));
         await page.locator('.cart_item a.remove').click();
@@ -93,6 +100,15 @@ async function checkout(page, email, validate = false) {
         await addProduct(page);
     }
     await open(page, '/checkout/');
+    if (validate) {
+        for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
+            await page.setViewportSize({width, height: 900});
+            await noOverflow(page, '/checkout/', width);
+            if (width === 390) {
+                await page.screenshot({path:samples + '/checkout-390.png', fullPage:true});
+            }
+        }
+    }
     if (validate) {
         await page.locator('#place_order').click();
         await page.locator('.woocommerce-error').waitFor();
@@ -231,6 +247,17 @@ async function resetPassword(page, email, password) {
         assert.equal(wp('eval', 'echo wc_get_order(' + customerOrder + ')->get_status();'), 'completed');
         assert.equal(wp('eval', 'echo wc_get_order(' + guestOrder + ')->get_customer_id();'), '0');
         assert.equal(wp('eval', 'echo wc_get_order(' + customerOrder + ')->get_payment_method();'), 'cod');
+        const outsiderEmail = 'other-' + email;
+        wp('user', 'create', outsiderEmail.split('@')[0], outsiderEmail, '--role=customer', '--user_pass=' + password);
+        const outsider = await browser.newPage();
+        await login(outsider, outsiderEmail, password);
+        await open(outsider, '/my-account/view-order/' + customerOrder + '/');
+        assert.equal(await outsider.locator('.woocommerce-order-details').count(), 0);
+        await open(customer, '/my-account/view-order/' + customerOrder + '/');
+        const repeat = customer.locator('a[href*="order_again="]');
+        await repeat.click();
+        await open(customer, '/cart/');
+        assert.match(await customer.locator('.cart_item').innerText(), /Atelier/);
         await open(admin, '/wp-admin/post-new.php?post_type=product');
         await admin.locator('#title').fill('ТЕСТ — черновик администратора');
         await admin.locator('#save-post').click();
