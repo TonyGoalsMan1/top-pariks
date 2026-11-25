@@ -12,7 +12,7 @@
 <header class="site-header">
     <div class="topbar">
         <div class="wrap">
-            <span><?php echo is_front_page() ? 'Интернет-магазин париков' : 'Доставка по всей России'; ?></span>
+            <span>Интернет-магазин париков</span>
             <a href="<?php echo esc_url(function_exists('wc_get_page_permalink') ? wc_get_page_permalink('myaccount') : wp_login_url()); ?>"><?php echo is_user_logged_in() ? 'Личный кабинет' : 'Войти'; ?></a>
         </div>
     </div>

@@ -122,6 +122,21 @@ $cod['instructions'] = 'Это тестовый заказ. Оплата не т
 update_option('woocommerce_cod_settings', $cod);
 update_option('woocommerce_coming_soon', 'no');
 
+$store_page_titles = [
+    'shop' => ['Shop', 'Каталог'],
+    'cart' => ['Cart', 'Корзина'],
+    'checkout' => ['Checkout', 'Оформление заказа'],
+    'myaccount' => ['My account', 'Личный кабинет'],
+];
+foreach ($store_page_titles as $key => [$original, $translated]) {
+    $page_id = wc_get_page_id($key);
+    if ($page_id > 0 && 0 === strcasecmp(get_post_field('post_title', $page_id), $original)) {
+        $updated = wp_update_post(['ID' => $page_id, 'post_title' => $translated], true);
+        if (is_wp_error($updated)) {
+            throw new RuntimeException($updated->get_error_message());
+        }
+    }
+}
 foreach (['returns' => 'Возврат', 'privacy-policy' => 'Политика конфиденциальности'] as $slug => $name) {
     $page = get_page_by_path($slug);
     if (!$page || 'publish' !== $page->post_status) {

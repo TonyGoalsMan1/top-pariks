@@ -100,6 +100,7 @@ async function checkout(page, email, validate = false) {
         await addProduct(page);
     }
     await open(page, '/checkout/');
+    assert.match(await page.locator('h1').innerText(), /Оформление заказа/);
     if (validate) {
         for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
             await page.setViewportSize({width, height: 900});
