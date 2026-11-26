@@ -80,6 +80,13 @@ async function menu(page, storefront) {
 }
 
 async function commerce(page, storefront) {
+    await open(page, '/wp-admin/edit.php?post_type=product&page=product_attributes');
+    await page.locator('#attribute_label').fill('Тест — характеристика Atelier');
+    await page.locator('#attribute_name').fill('atelier-qa');
+    await page.locator('#submit').click();
+    await page.locator('table').getByText('Тест — характеристика Atelier', { exact: true }).waitFor();
+    assert.ok(Number(wp('eval', 'echo wc_attribute_taxonomy_id_by_name("atelier-qa");')));
+
     const id = wp('eval', 'echo wc_get_product_id_by_sku("TOPQA-SYNTHETIC");');
     assert.ok(Number(id));
     await open(page, '/wp-admin/post.php?post=' + id + '&action=edit');

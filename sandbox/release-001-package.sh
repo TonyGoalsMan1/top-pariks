@@ -12,9 +12,12 @@ output="$(cd "$output" && pwd)"
 work="$(mktemp -d)"
 archive=top-pariks-atelier-portable.tar.gz
 
+repo_root="$PWD"
 TOP_PARIKS_STORE005=yes bash sandbox/store-004-package.sh "$work/package"
 (
     cd "$work/package"
+    cp "$repo_root/docs/RELEASE-001-admin.md" "$repo_root/docs/RELEASE-001-launch.md" .
+    sha256sum RELEASE-001-admin.md RELEASE-001-launch.md >> SHA256SUMS
     tar -czf "$output/$archive" .
 )
 (

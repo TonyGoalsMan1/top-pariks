@@ -125,9 +125,13 @@ jobs:
             packages+=(lighthouse@12.8.2)
           fi
           npm install --no-save --package-lock=false "${packages[@]}"
-          npx playwright-core install --with-deps chromium
-          if npx playwright-core install --with-deps webkit; then
-            echo 'TOP_PARIKS_TEST_WEBKIT=yes' >> "$GITHUB_ENV"
+          if [[ "$GITHUB_REF_NAME" == release-001/candidate ]]; then
+            npx playwright-core install chromium
+          else
+            npx playwright-core install --with-deps chromium
+            if npx playwright-core install --with-deps webkit; then
+              echo 'TOP_PARIKS_TEST_WEBKIT=yes' >> "$GITHUB_ENV"
+            fi
           fi
       - name: Technical SEO audit
         if: github.ref_name == 'store-005/launch-prep' || github.ref_name == 'release-001/candidate'
