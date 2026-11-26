@@ -102,17 +102,6 @@ async function commerce(page, storefront) {
     assert.match(await storefront.locator('.atelier-home .products').innerText(), /Studio/);
 
     console.log('WooCommerce Admin: global attribute, discount, featured product and SEO fields persisted.');
-    await open(page, '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=cod');
-    const paymentForm = page.locator('form.settings-form');
-    await paymentForm.locator('input[type="text"]').first().fill('Тест — офлайн-оплата Atelier');
-    const [paymentSaved] = await Promise.all([
-        page.waitForResponse(response => response.request().method() !== 'GET'
-            && decodeURIComponent(response.url()).includes('settings/payments/offline-methods')),
-        paymentForm.locator('button[type="submit"]').click(),
-    ]);
-    assert.ok(paymentSaved.ok(), 'WooCommerce did not save the offline method');
-    assert.equal(JSON.parse(wp('option', 'get', 'woocommerce_cod_settings', '--format=json')).title, 'Тест — офлайн-оплата Atelier');
-
     const flatRate = wp('eval', 'foreach (WC_Shipping_Zones::get_zones() as $zone) { foreach ($zone["shipping_methods"] as $method) { if ($method->id === "flat_rate") { echo $method->get_instance_id(); break 2; } } }');
     assert.ok(Number(flatRate));
     await open(page, '/wp-admin/admin.php?page=wc-settings&tab=shipping&instance_id=' + flatRate);
@@ -120,7 +109,21 @@ async function commerce(page, storefront) {
     await page.locator('button[name="save"]').click();
     await page.locator('#woocommerce_flat_rate_title').waitFor();
     assert.equal(JSON.parse(wp('option', 'get', 'woocommerce_flat_rate_' + flatRate + '_settings', '--format=json')).title, 'Тест — доставка Atelier');
-    console.log('WooCommerce Admin: offline payment and flat-rate shipping persisted.');
+    console.log('WooCommerce Admin: flat-rate shipping persisted.');
+
+    await open(page, '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=cod');
+    const paymentForm = page.locator('form.settings-form');
+    const paymentTitle = 'Тест — офлайн-оплата Atelier';
+    await paymentForm.locator('input[type="text"]').first().fill(paymentTitle);
+    await paymentForm.locator('button[type="submit"]').click();
+    const readPaymentTitle = () => JSON.parse(wp('option', 'get', 'woocommerce_cod_settings', '--format=json')).title;
+    let savedTitle = readPaymentTitle();
+    for (let attempt = 0; savedTitle !== paymentTitle && attempt < 10; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        savedTitle = readPaymentTitle();
+    }
+    assert.equal(savedTitle, paymentTitle, 'The native offline payment method did not persist');
+    console.log('WooCommerce Admin: offline payment persisted.');
 }
 
 async function run() {
