@@ -45,7 +45,7 @@ jobs:
           wp eval-file - < sandbox/store-003-fixtures.php
           wp eval 'printf("WordPress %s, WooCommerce %s, locale %s\n", get_bloginfo("version"), WC_VERSION, get_locale()); foreach (["shop", "cart", "checkout", "myaccount"] as $page) { if (wc_get_page_id($page) < 1) { WP_CLI::error($page); } }'
           wp plugin list --status=must-use
-          if [[ "$TOP_PARIKS_STORE005" == yes ]]; then
+          if [[ "$TOP_PARIKS_STORE005" == yes || "$GITHUB_REF_NAME" == release-001/candidate ]]; then
             wp eval '$customer = get_role("customer"); $manager = get_role("shop_manager"); if (!$customer || !$manager || $customer->has_cap("edit_products") || $customer->has_cap("manage_woocommerce") || !$manager->has_cap("edit_products")) { WP_CLI::error("Unexpected storefront role capabilities"); } WP_CLI::success("Customer and shop-manager role separation verified.");'
           fi
       - name: Package and restore the demonstration independently
