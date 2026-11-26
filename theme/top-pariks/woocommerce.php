@@ -67,13 +67,29 @@ get_header();
     };
     add_action('woocommerce_archive_description', $render_catalog_controls, 30);
 
-    $custom_empty_state = is_search() || (is_shop() && !is_paged() && !tp_has_catalog_parameters());
+    $custom_empty_state = is_search() || is_shop() || is_product_taxonomy();
     $render_empty_state = static function () {
         if (is_search()) {
             get_template_part('search-empty');
             return;
         }
-        echo '<p class="notice">В каталоге пока нет товаров. Загляните позже, чтобы посмотреть новые модели TOP-PARIKS.</p>';
+        $reset_url = is_product_taxonomy() ? get_term_link(get_queried_object()) : tp_catalog_url();
+        if (is_wp_error($reset_url)) {
+            $reset_url = tp_catalog_url();
+        }
+        ?>
+        <section class="search-empty" aria-labelledby="catalog-empty-title">
+            <h2 id="catalog-empty-title"><?php esc_html_e('Подходящих моделей пока нет', 'top-pariks'); ?></h2>
+            <?php if (tp_has_catalog_parameters()) : ?>
+                <p><?php esc_html_e('Сбросьте фильтры, чтобы увидеть больше моделей.', 'top-pariks'); ?></p>
+                <a class="button" href="<?php echo esc_url($reset_url); ?>"><?php esc_html_e('Сбросить фильтры', 'top-pariks'); ?></a>
+            <?php elseif (is_product_taxonomy() || is_paged()) : ?>
+                <a class="button" href="<?php echo esc_url(tp_catalog_url()); ?>"><?php esc_html_e('Весь каталог', 'top-pariks'); ?></a>
+            <?php else : ?>
+                <p><?php esc_html_e('Загляните позже, чтобы посмотреть новые модели TOP-PARIKS.', 'top-pariks'); ?></p>
+            <?php endif; ?>
+        </section>
+        <?php
     };
     if ($custom_empty_state) {
         remove_action('woocommerce_no_products_found', 'wc_no_products_found');
