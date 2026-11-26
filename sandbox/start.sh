@@ -48,8 +48,8 @@ fi
 # Install the pinned package directly into the test container. Core blocks
 # external HTTP and dashboard-based plugin installs for this environment.
 if ! wp plugin is-installed woocommerce; then
-    download https://github.com/woocommerce/woocommerce/releases/download/10.5.3/woocommerce.zip \
-        "$runtime_dir/woocommerce.zip" cfba4ef7f052b20d3f750257c2bd2e84ce214685625cf36753105b6f4febb760
+    download https://github.com/woocommerce/woocommerce/releases/download/11.3.1/woocommerce.zip \
+        "$runtime_dir/woocommerce.zip" 8fe15ed36796eefd8aebc84363520ea10b95e034071353ba3e4773333f09f278
     docker compose cp "$runtime_dir/woocommerce.zip" wordpress:/tmp/top-pariks-woocommerce.zip
     docker compose exec -T --user www-data wordpress php -r '
         $archive = new ZipArchive();
