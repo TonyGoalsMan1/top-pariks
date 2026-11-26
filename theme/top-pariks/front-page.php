@@ -13,9 +13,14 @@ $categories = [
 ];
 $category_links = [];
 foreach ($categories as $slug => [$image, $label]) {
-    $url = get_term_link($slug, 'product_cat');
+    $term = get_term_by('slug', $slug, 'product_cat');
+    if (!$term) {
+        continue;
+    }
+    $url = get_term_link($term);
     if (!is_wp_error($url)) {
-        $category_links[] = [$url, $image, $label];
+        $thumbnail = (int) get_term_meta($term->term_id, 'thumbnail_id', true);
+        $category_links[] = [$url, $image, $label, $thumbnail];
     }
 }
 ?>
@@ -52,10 +57,15 @@ foreach ($categories as $slug => [$image, $label]) {
                 <a href="<?php echo esc_url($catalog_url); ?>">Весь каталог</a>
             </div>
             <div class="categories">
-                <?php foreach ($category_links as [$url, $image, $label]) : ?>
+                <?php foreach ($category_links as [$url, $image, $label, $thumbnail]) : ?>
                     <a class="category" href="<?php echo esc_url($url); ?>">
                         <div class="atelier-category-image">
-                            <img loading="lazy" src="<?php echo tp_image($image); ?>" alt="">
+                            <?php $category_image = wp_get_attachment_image($thumbnail, 'woocommerce_thumbnail', false, ['loading' => 'lazy', 'alt' => '']); ?>
+                            <?php if ($category_image) : ?>
+                                <?php echo $category_image; ?>
+                            <?php else : ?>
+                                <img loading="lazy" src="<?php echo tp_image($image); ?>" alt="">
+                            <?php endif; ?>
                         </div>
                         <span><?php echo esc_html($label); ?></span>
                     </a>
@@ -73,7 +83,7 @@ foreach ($categories as $slug => [$image, $label]) {
     ?>
     <section class="section wrap" aria-labelledby="atelier-products-title">
         <div class="section-head">
-            <h2 id="atelier-products-title"><?php echo $recommended ? 'Рекомендуемые модели' : 'Модели из каталога'; ?></h2>
+            <h2 id="atelier-products-title"><?php echo esc_html(tp_homepage_text($recommended ? 'tp_featured_heading' : 'tp_products_heading')); ?></h2>
             <a href="<?php echo esc_url($catalog_url); ?>">Все модели</a>
         </div>
         <?php if ($items) : ?>

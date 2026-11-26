@@ -6,6 +6,9 @@ function tp_homepage_defaults() {
         'tp_hero_heading' => __('Парики для вашего образа', 'top-pariks'),
         'tp_hero_description' => __('Натуральные и синтетические модели. Выберите длину, оттенок и укладку, которые вам подходят.', 'top-pariks'),
         'tp_hero_button' => __('Перейти в каталог', 'top-pariks'),
+        'tp_category_heading' => __('Основные категории', 'top-pariks'),
+        'tp_featured_heading' => __('Рекомендуемые модели', 'top-pariks'),
+        'tp_products_heading' => __('Модели из каталога', 'top-pariks'),
     ];
 }
 
@@ -29,6 +32,9 @@ function tp_homepage_customize($customizer) {
         'tp_hero_heading' => [__('Заголовок баннера', 'top-pariks'), 'text', 'sanitize_text_field'],
         'tp_hero_description' => [__('Текст баннера', 'top-pariks'), 'textarea', 'sanitize_textarea_field'],
         'tp_hero_button' => [__('Подпись кнопки каталога', 'top-pariks'), 'text', 'sanitize_text_field'],
+        'tp_category_heading' => [__('Заголовок блока категорий', 'top-pariks'), 'text', 'sanitize_text_field'],
+        'tp_featured_heading' => [__('Заголовок блока рекомендуемых товаров', 'top-pariks'), 'text', 'sanitize_text_field'],
+        'tp_products_heading' => [__('Заголовок блока товаров из каталога', 'top-pariks'), 'text', 'sanitize_text_field'],
         'tp_contact_phone' => [__('Публичный телефон', 'top-pariks'), 'tel', 'tp_sanitize_contact_phone'],
         'tp_contact_email' => [__('Публичная почта', 'top-pariks'), 'email', 'sanitize_email'],
     ];
