@@ -72,11 +72,17 @@ async function customize(page, storefront) {
 }
 
 async function menu(page, storefront) {
-    await open(page, '/wp-admin/nav-menus.php');
+    const id = wp('eval', 'echo get_nav_menu_locations()["primary"] ?? 0;');
+    assert.ok(Number(id), 'The primary menu is assigned');
+    await open(page, '/wp-admin/nav-menus.php?action=edit&menu=' + id);
     const first = page.locator('#menu-to-edit .menu-item').first();
     await first.locator('.item-edit').click();
     await first.locator('input.edit-menu-item-title').fill('Тест — пункт меню Atelier');
-    await page.locator('#save_menu_footer').click();
+    await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+        page.locator('#save_menu_footer').click(),
+    ]);
+    assert.match(wp('menu', 'item', 'list', id, '--field=title'), /Тест — пункт меню Atelier/);
     await open(storefront, '/');
     assert.match(await storefront.locator('#tp-navigation').innerText(), /Тест — пункт меню Atelier/);
     console.log('Appearance: assigned menu updated in WordPress Admin.');
