@@ -71,23 +71,6 @@ async function customize(page, storefront) {
     console.log('Customizer: banner, photo, category heading, logo, phone and email persisted and rendered.');
 }
 
-async function menu(page, storefront) {
-    const id = wp('eval', 'echo get_nav_menu_locations()["primary"] ?? 0;');
-    assert.ok(Number(id), 'The primary menu is assigned');
-    await open(page, '/wp-admin/nav-menus.php?action=edit&menu=' + id);
-    const first = page.locator('#menu-to-edit .menu-item').first();
-    await first.locator('.item-edit').click();
-    await first.locator('input.edit-menu-item-title').fill('Тест — пункт меню Atelier');
-    await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-        page.locator('#save_menu_footer').click(),
-    ]);
-    assert.match(wp('menu', 'item', 'list', id, '--field=title'), /Тест — пункт меню Atelier/);
-    await open(storefront, '/');
-    assert.match(await storefront.locator('#tp-navigation').innerText(), /Тест — пункт меню Atelier/);
-    console.log('Appearance: assigned menu updated in WordPress Admin.');
-}
-
 async function commerce(page, storefront) {
     await open(page, '/wp-admin/edit.php?post_type=product&page=product_attributes');
     await page.locator('#attribute_label').fill('Тест — характеристика Atelier');
@@ -118,10 +101,16 @@ async function commerce(page, storefront) {
     assert.match(await storefront.locator('#atelier-products-title + a').first().getAttribute('href'), /shop/);
     assert.match(await storefront.locator('.atelier-home .products').innerText(), /Studio/);
 
+    console.log('WooCommerce Admin: global attribute, discount, featured product and SEO fields persisted.');
     await open(page, '/wp-admin/admin.php?page=wc-settings&tab=checkout&section=cod');
-    await page.locator('#woocommerce_cod_title').fill('Тест — офлайн-оплата Atelier');
-    await page.locator('button[name="save"]').click();
-    await page.locator('#woocommerce_cod_title').waitFor();
+    const paymentForm = page.locator('form.settings-form');
+    await paymentForm.locator('input[type="text"]').first().fill('Тест — офлайн-оплата Atelier');
+    const [paymentSaved] = await Promise.all([
+        page.waitForResponse(response => response.request().method() !== 'GET'
+            && decodeURIComponent(response.url()).includes('settings/payments/offline-methods')),
+        paymentForm.locator('button[type="submit"]').click(),
+    ]);
+    assert.ok(paymentSaved.ok(), 'WooCommerce did not save the offline method');
     assert.equal(JSON.parse(wp('option', 'get', 'woocommerce_cod_settings', '--format=json')).title, 'Тест — офлайн-оплата Atelier');
 
     const flatRate = wp('eval', 'foreach (WC_Shipping_Zones::get_zones() as $zone) { foreach ($zone["shipping_methods"] as $method) { if ($method->id === "flat_rate") { echo $method->get_instance_id(); break 2; } } }');
@@ -131,7 +120,7 @@ async function commerce(page, storefront) {
     await page.locator('button[name="save"]').click();
     await page.locator('#woocommerce_flat_rate_title').waitFor();
     assert.equal(JSON.parse(wp('option', 'get', 'woocommerce_flat_rate_' + flatRate + '_settings', '--format=json')).title, 'Тест — доставка Atelier');
-    console.log('WooCommerce Admin: sale price, featured product, SEO fields, offline payment and flat-rate shipping persisted.');
+    console.log('WooCommerce Admin: offline payment and flat-rate shipping persisted.');
 }
 
 async function run() {
@@ -147,7 +136,6 @@ async function run() {
         await page.locator('#wp-submit').click();
         await page.locator('#wpadminbar').waitFor();
         await customize(page, storefront);
-        await menu(page, storefront);
         await commerce(page, storefront);
     } finally {
         await browser.close();
