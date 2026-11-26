@@ -53,7 +53,7 @@ foreach ($categories as $slug => [$image, $label]) {
     <?php if ($category_links) : ?>
         <section class="section wrap" id="atelier-categories" aria-labelledby="atelier-category-title">
             <div class="section-head">
-                <h2 id="atelier-category-title">Популярные категории</h2>
+                <h2 id="atelier-category-title"><?php echo esc_html(tp_homepage_text('tp_category_heading')); ?></h2>
                 <a href="<?php echo esc_url($catalog_url); ?>">Весь каталог</a>
             </div>
             <div class="categories">

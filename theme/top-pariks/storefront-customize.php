@@ -6,7 +6,7 @@ function tp_homepage_defaults() {
         'tp_hero_heading' => __('Парики для вашего образа', 'top-pariks'),
         'tp_hero_description' => __('Натуральные и синтетические модели. Выберите длину, оттенок и укладку, которые вам подходят.', 'top-pariks'),
         'tp_hero_button' => __('Перейти в каталог', 'top-pariks'),
-        'tp_category_heading' => __('Основные категории', 'top-pariks'),
+        'tp_category_heading' => __('Популярные категории', 'top-pariks'),
         'tp_featured_heading' => __('Рекомендуемые модели', 'top-pariks'),
         'tp_products_heading' => __('Модели из каталога', 'top-pariks'),
     ];
