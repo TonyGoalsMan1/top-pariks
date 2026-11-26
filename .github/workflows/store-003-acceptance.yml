@@ -97,6 +97,19 @@ jobs:
         run: |
           docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" eval-file - < sandbox/store-004-content.php
           echo 'TOP_PARIKS_STORE004=yes' >> "$GITHUB_ENV"
+      - name: Build and restore the release archive from its exported bytes
+        if: github.ref_name == 'release-001/candidate'
+        env:
+          ATELIER_RESTORE_PROJECT: atelier-restore-release
+          ATELIER_DEMO_PORT: 8086
+        run: ATELIER_DEMO_DB_PASSWORD="$(openssl rand -hex 24)" bash sandbox/release-001-package.sh "$RUNNER_TEMP/release-001-portable"
+      - uses: actions/upload-artifact@v4
+        if: github.ref_name == 'release-001/candidate'
+        with:
+          name: release-001-portable
+          path: ${{ runner.temp }}/release-001-portable/
+          if-no-files-found: error
+          retention-days: 90
       - name: Import and update synthetic products by SKU
         if: github.ref_name == 'store-005/launch-prep' || github.ref_name == 'release-001/candidate'
         run: |
@@ -161,6 +174,9 @@ jobs:
           path: store-003-screenshots/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Verify release controls in WordPress Admin
+        if: github.ref_name == 'release-001/candidate'
+        run: node sandbox/release-001-admin.cjs
       - name: Repeat Lighthouse lab runs
         if: github.ref_name == 'store-005/launch-prep' || github.ref_name == 'design-002/polish'
         run: bash sandbox/store-005-lighthouse.sh
