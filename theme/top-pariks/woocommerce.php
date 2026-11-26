@@ -78,13 +78,13 @@ get_header();
             $reset_url = tp_catalog_url();
         }
         ?>
-        <section class="search-empty" aria-labelledby="catalog-empty-title">
+        <section class="atelier-search-help" aria-labelledby="catalog-empty-title">
             <h2 id="catalog-empty-title"><?php esc_html_e('Подходящих моделей пока нет', 'top-pariks'); ?></h2>
             <?php if (tp_has_catalog_parameters()) : ?>
                 <p><?php esc_html_e('Сбросьте фильтры, чтобы увидеть больше моделей.', 'top-pariks'); ?></p>
-                <a class="button" href="<?php echo esc_url($reset_url); ?>"><?php esc_html_e('Сбросить фильтры', 'top-pariks'); ?></a>
+                <a class="btn" href="<?php echo esc_url($reset_url); ?>"><?php esc_html_e('Сбросить фильтры', 'top-pariks'); ?></a>
             <?php elseif (is_product_taxonomy() || is_paged()) : ?>
-                <a class="button" href="<?php echo esc_url(tp_catalog_url()); ?>"><?php esc_html_e('Весь каталог', 'top-pariks'); ?></a>
+                <a class="btn" href="<?php echo esc_url(tp_catalog_url()); ?>"><?php esc_html_e('Весь каталог', 'top-pariks'); ?></a>
             <?php else : ?>
                 <p><?php esc_html_e('Загляните позже, чтобы посмотреть новые модели TOP-PARIKS.', 'top-pariks'); ?></p>
             <?php endif; ?>

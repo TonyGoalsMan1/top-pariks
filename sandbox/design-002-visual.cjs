@@ -12,7 +12,7 @@ const routes = {
     'search-empty': '/?s=design002-no-result&post_type=product',
     cart: '/cart/', checkout: '/checkout/', account: '/my-account/',
     about: '/about/', contacts: '/contacts/', delivery: '/delivery/', returns: '/returns/',
-    guide: '/wig-guide/', care: '/wig-care/', faq: '/faq/', privacy: '/privacy-policy/',
+    guide: '/wig-guide/', care: '/wig-care/', faq: '/faq/',
 };
 
 async function open(page, route) {
@@ -33,7 +33,9 @@ async function run() {
         await open(page, '/cart/');
         await page.locator('.woocommerce-cart-form .cart_item').first().waitFor();
 
-        for (const [name, route] of Object.entries(routes)) {
+        const privacy = await page.locator('footer a').filter({ hasText: 'Политика конфиденциальности' }).getAttribute('href');
+        assert.ok(privacy, 'Privacy page is linked from the footer');
+        for (const [name, route] of Object.entries({ ...routes, privacy })) {
             await page.setViewportSize({ width: 390, height: 870 });
             await open(page, route);
             assert.match(await page.locator('html').getAttribute('lang'), /^ru/i, name);
