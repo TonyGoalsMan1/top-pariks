@@ -1,8 +1,8 @@
 <?php
 defined('ABSPATH') || exit;
 
-function tp_product_seo_title($parts) {
-    if (is_singular('product') && !post_password_required()) {
+function tp_content_seo_title($parts) {
+    if (is_singular(['product', 'page', 'post']) && !tp_is_service_page() && !post_password_required()) {
         $title = trim(wp_strip_all_tags((string) get_post_meta(get_queried_object_id(), 'atelier_seo_title', true), true));
         if ($title !== '') {
             $parts['title'] = $title;
@@ -10,7 +10,7 @@ function tp_product_seo_title($parts) {
     }
     return $parts;
 }
-add_filter('document_title_parts', 'tp_product_seo_title');
+add_filter('document_title_parts', 'tp_content_seo_title');
 
 function tp_catalog_canonical_url() {
     if (!function_exists('is_shop') || is_search() || !(is_shop() || is_product_taxonomy())) {
@@ -83,3 +83,43 @@ function tp_sitemap_catalog_terms($args, $taxonomy) {
     return $args;
 }
 add_filter('wp_sitemaps_taxonomies_query_args', 'tp_sitemap_catalog_terms', 10, 2);
+
+function tp_seo_fields() {
+    add_meta_box('atelier-seo', __('SEO Atelier', 'top-pariks'), 'tp_seo_fields_markup', ['post', 'page', 'product']);
+}
+add_action('add_meta_boxes', 'tp_seo_fields');
+
+function tp_seo_fields_markup($post) {
+    wp_nonce_field('tp_save_seo_fields', 'tp_seo_nonce');
+    ?>
+    <p><label for="atelier_seo_title"><?php esc_html_e('Заголовок для поиска', 'top-pariks'); ?></label></p>
+    <input type="text" class="widefat" id="atelier_seo_title" name="atelier_seo_title"
+        value="<?php echo esc_attr(get_post_meta($post->ID, 'atelier_seo_title', true)); ?>">
+    <p><label for="atelier_seo_description"><?php esc_html_e('Описание для поиска', 'top-pariks'); ?></label></p>
+    <textarea class="widefat" rows="3" id="atelier_seo_description" name="atelier_seo_description"><?php
+        echo esc_textarea(get_post_meta($post->ID, 'atelier_seo_description', true));
+    ?></textarea>
+    <p class="description"><?php esc_html_e('Пустые поля используют заголовок и описание по умолчанию.', 'top-pariks'); ?></p>
+    <?php
+}
+
+function tp_save_seo_fields($post_id) {
+    if (!isset($_POST['tp_seo_nonce']) || !is_string($_POST['tp_seo_nonce'])
+        || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['tp_seo_nonce'])), 'tp_save_seo_fields')
+        || wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)
+        || !current_user_can('edit_post', $post_id)) {
+        return;
+    }
+    foreach (['atelier_seo_title', 'atelier_seo_description'] as $key) {
+        if (!isset($_POST[$key]) || !is_string($_POST[$key])) {
+            continue;
+        }
+        $value = sanitize_text_field(wp_unslash($_POST[$key]));
+        if ($value === '') {
+            delete_post_meta($post_id, $key);
+        } else {
+            update_post_meta($post_id, $key, $value);
+        }
+    }
+}
+add_action('save_post', 'tp_save_seo_fields');

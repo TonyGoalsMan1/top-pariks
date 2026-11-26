@@ -91,16 +91,17 @@ function tp_storefront_description() {
 
     $description = '';
     if (is_front_page() && !is_paged()) {
-        $description = get_bloginfo('description');
+        $description = is_page() ? (string) get_post_meta(get_queried_object_id(), 'atelier_seo_description', true) : '';
+        if (trim($description) === '') {
+            $description = get_bloginfo('description');
+        }
         if ('' === trim($description) || in_array($description, ['Just another WordPress site', 'Ещё один сайт на WordPress'], true)) {
             $description = 'Натуральные и искусственные модели на каждый день и для особых случаев.';
         }
     } elseif (is_singular() || (function_exists('is_shop') && is_shop() && !is_paged() && !tp_has_catalog_parameters())) {
         $post = is_singular() ? get_queried_object() : get_post(wc_get_page_id('shop'));
         if ($post instanceof WP_Post && 'publish' === $post->post_status && '' === $post->post_password) {
-            if ('product' === $post->post_type) {
-                $description = (string) get_post_meta($post->ID, 'atelier_seo_description', true);
-            }
+            $description = (string) get_post_meta($post->ID, 'atelier_seo_description', true);
             if ('' === trim($description)) {
                 $description = $post->post_excerpt;
             }
