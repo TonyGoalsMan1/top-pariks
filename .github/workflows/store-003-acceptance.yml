@@ -2,7 +2,7 @@ name: STORE-003 acceptance
 
 on:
   push:
-    branches: [p0/store-003-acceptance, store-004/demo, store-005/launch-prep]
+    branches: [p0/store-003-acceptance, store-004/demo, store-005/launch-prep, design-002/polish]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Audit tracked files for credential patterns
         if: github.ref_name == 'store-005/launch-prep'
         run: python3 -B sandbox/store-005-secret-audit.py
@@ -102,7 +103,7 @@ jobs:
       - name: Install browser engines
         run: |
           packages=(playwright-core@1.56.1)
-          if [[ "$TOP_PARIKS_STORE005" == yes ]]; then
+          if [[ "$TOP_PARIKS_STORE005" == yes || "$GITHUB_REF_NAME" == design-002/polish ]]; then
             packages+=(lighthouse@12.8.2)
           fi
           npm install --no-save --package-lock=false "${packages[@]}"
@@ -113,6 +114,29 @@ jobs:
       - name: Technical SEO audit
         if: github.ref_name == 'store-005/launch-prep'
         run: node sandbox/store-005-seo.cjs
+      - name: Capture DESIGN-002 before and after on one storefront
+        if: github.ref_name == 'design-002/polish'
+        run: |
+          set -euo pipefail
+          wp() { docker compose exec -T --user www-data wordpress php /tmp/top-pariks-wp-cli.phar --url="$TOP_PARIKS_URL" "$@"; }
+          wp eval-file - < sandbox/store-004-content.php
+          echo 'TOP_PARIKS_STORE004=yes' >> "$GITHUB_ENV"
+          docker compose exec -T wordpress mkdir -p /var/www/html/wp-content/themes/top-pariks-baseline
+          git archive 3735902:theme/top-pariks | docker compose exec -T wordpress tar -xf - -C /var/www/html/wp-content/themes/top-pariks-baseline
+          wp eval 'update_option("theme_mods_top-pariks-baseline", get_option("theme_mods_top-pariks", []));'
+          trap 'wp theme activate top-pariks' EXIT
+          wp theme activate top-pariks-baseline
+          node sandbox/design-002-visual.cjs before
+          wp theme activate top-pariks
+          trap - EXIT
+          node sandbox/design-002-visual.cjs after
+      - uses: actions/upload-artifact@v4
+        if: always() && github.ref_name == 'design-002/polish'
+        with:
+          name: design-002-screenshots
+          path: design-002-screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Buyer acceptance
         run: node sandbox/store-003-browser.cjs
       - uses: actions/upload-artifact@v4
@@ -123,10 +147,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       - name: Repeat Lighthouse lab runs
-        if: github.ref_name == 'store-005/launch-prep'
+        if: github.ref_name == 'store-005/launch-prep' || github.ref_name == 'design-002/polish'
         run: bash sandbox/store-005-lighthouse.sh
       - uses: actions/upload-artifact@v4
-        if: always() && github.ref_name == 'store-005/launch-prep'
+        if: always() && (github.ref_name == 'store-005/launch-prep' || github.ref_name == 'design-002/polish')
         with:
           name: store-005-lighthouse
           path: store-005-lighthouse/
