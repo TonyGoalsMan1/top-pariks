@@ -20,12 +20,15 @@ async function open(page, path) {
 async function chooseMedia(page, control, crop = false) {
     await control.locator('button.upload-button, button.select-media').first().click();
     const modal = page.locator('.media-modal:visible').last();
+    await modal.waitFor();
+    const library = modal.locator('#menu-item-browse');
+    if (await library.isVisible()) await library.click();
     await modal.locator('.attachments .attachment').first().click();
     await modal.locator('button.media-button-select').click();
     if (crop) {
         const skip = page.locator('.media-modal:visible button.media-button-skip');
-        await skip.waitFor();
-        await skip.click();
+        await Promise.race([skip.waitFor(), modal.waitFor({ state: 'hidden' })]);
+        if (await skip.isVisible()) await skip.click();
     }
     await modal.waitFor({ state: 'hidden' });
 }
