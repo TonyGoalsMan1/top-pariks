@@ -2,6 +2,7 @@
 get_header();
 
 $catalog_url = tp_catalog_url();
+$hero_image = wp_get_attachment_image((int) get_theme_mod('tp_hero_image', 0), 'large', false, ['class' => 'hero-image', 'fetchpriority' => 'high', 'loading' => false]);
 $contacts_url = tp_published_page_url('contacts');
 $delivery_url = tp_published_page_url('delivery');
 $categories = [
@@ -23,17 +24,23 @@ foreach ($categories as $slug => [$image, $label]) {
         <div class="hero-inner">
             <div class="hero-copy">
                 <p class="atelier-label">TOP-PARIKS Atelier</p>
-                <h1 id="atelier-title">Парики для вашего образа</h1>
-                <p>Натуральные и искусственные модели. Выберите длину, оттенок и укладку, которые вам подходят.</p>
+                <h1 id="atelier-title"><?php echo esc_html(tp_homepage_text('tp_hero_heading')); ?></h1>
+                <?php if ($hero_description = tp_homepage_text('tp_hero_description')) : ?>
+                    <p><?php echo esc_html($hero_description); ?></p>
+                <?php endif; ?>
                 <div class="atelier-actions">
-                    <a class="btn" href="<?php echo esc_url($catalog_url); ?>">Перейти в каталог</a>
+                    <a class="btn" href="<?php echo esc_url($catalog_url); ?>"><?php echo esc_html(tp_homepage_text('tp_hero_button')); ?></a>
                     <?php if ($category_links) : ?>
                         <a class="atelier-link" href="#atelier-categories">Выбрать категорию</a>
                     <?php endif; ?>
                 </div>
             </div>
             <div class="hero-media">
-                <img class="hero-image" src="<?php echo tp_image('hero'); ?>" alt="Модель с объёмными волнистыми волосами" width="395" height="368" fetchpriority="high">
+                <?php if ($hero_image) : ?>
+                    <?php echo $hero_image; ?>
+                <?php else : ?>
+                    <img class="hero-image" src="<?php echo tp_image('hero'); ?>" alt="Модель с объёмными волнистыми волосами" width="395" height="368" fetchpriority="high">
+                <?php endif; ?>
             </div>
         </div>
     </section>

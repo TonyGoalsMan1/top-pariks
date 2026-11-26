@@ -18,9 +18,13 @@
     </div>
     <div class="mast">
         <div class="wrap mast-inner">
-            <a class="brand" href="<?php echo esc_url(home_url('/')); ?>">
-                TOP-PARIKS<small>Интернет-магазин париков</small>
-            </a>
+            <?php if (has_custom_logo()) : ?>
+                <div class="brand brand-logo"><?php the_custom_logo(); ?></div>
+            <?php else : ?>
+                <a class="brand" href="<?php echo esc_url(home_url('/')); ?>">
+                    TOP-PARIKS<small>Интернет-магазин париков</small>
+                </a>
+            <?php endif; ?>
             <form class="product-search" action="<?php echo esc_url(home_url('/')); ?>" method="get" role="search">
                 <label class="screen-reader-text" for="tp-search">Поиск товаров</label>
                 <input id="tp-search" name="s" type="search" value="<?php echo esc_attr(is_search() ? get_search_query(false) : ''); ?>" placeholder="Поиск по каталогу">

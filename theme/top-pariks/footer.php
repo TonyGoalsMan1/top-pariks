@@ -4,6 +4,7 @@
             <div>
                 <p class="footer-brand">TOP-PARIKS Atelier</p>
                 <p>© <?php echo esc_html(wp_date('Y')); ?> TOP-PARIKS</p>
+                <?php tp_footer_contacts(); ?>
             </div>
             <nav aria-label="Навигация в подвале">
                 <?php tp_fallback_menu(); ?>

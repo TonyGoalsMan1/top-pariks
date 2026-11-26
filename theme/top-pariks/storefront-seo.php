@@ -43,6 +43,9 @@ function tp_open_graph() {
     }
 
     $image_id = is_singular() ? get_post_thumbnail_id() : 0;
+    if (is_front_page() && get_theme_mod('tp_hero_image')) {
+        $image_id = (int) get_theme_mod('tp_hero_image');
+    }
     if (!$image_id && function_exists('is_product_category') && is_product_category()) {
         $image_id = (int) get_term_meta(get_queried_object_id(), 'thumbnail_id', true);
     }
